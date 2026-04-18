@@ -4,6 +4,10 @@ Assumes: solid ML/DL + PyTorch background. Gaps: ECG signal processing, clinical
 
 Each phase has a **goal** and a **done signal** — a concrete thing you should be able to do or explain without looking it up.
 
+## Teaching Style
+
+Claude teaches one concept per message. Each message ends with a single checkpoint question. The next concept only unlocks after you answer it. No multi-part content dumps. If a message feels too long, say "slow down" and Claude will break it further.
+
 ---
 
 ## Phase 1 — Chagas Disease and Clinical ECG Basics
