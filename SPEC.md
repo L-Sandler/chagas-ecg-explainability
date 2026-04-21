@@ -41,7 +41,7 @@ The winning team scored 0.323 on the test set. A well-implemented baseline shoul
 
 **Total training data: ~378k ECG recordings.** Hidden validation and test sets (REDS-II, SaMi-Trop 3, ELSA-Brasil) were used by the challenge organizers — these represent different population distributions and are the source of the domain shift problem (see below).
 
-**Access:** All training datasets are publicly available through PhysioNet. No credentialing required for CODE-15%.
+**Access:** All training datasets are publicly available through PhysioNet. No credentialing required. See [DATA_SETUP.md](DATA_SETUP.md) for reproducible download instructions.
 
 ---
 
@@ -141,7 +141,7 @@ Since the model is a 1D CNN, standard 2D methods adapt directly:
 | Experiment tracking | Weights & Biases |
 | Explainability | `captum` (Grad-CAM 1D), manual SE weight extraction |
 | Evaluation | `sklearn`, custom TPR@5% scorer |
-| Compute | Kaggle free (prototyping) → RunPod community (~$2/hr, training) |
+| Compute | Local (prototyping) → Kaggle free (larger runs) → RunPod community (~$2/hr, training) |
 
 ---
 
@@ -149,7 +149,7 @@ Since the model is a 1D CNN, standard 2D methods adapt directly:
 
 | Phase | Task | Platform | Estimated Cost |
 |---|---|---|---|
-| Prototyping | Preprocessing pipeline, small subset | Kaggle free | $0 |
+| Prototyping | Preprocessing pipeline, small subset | Local / Kaggle free | $0 |
 | Baseline training | 1D ResNet on full CODE-15% | RunPod A100 ~4–6 hrs | $8–12 |
 | Experiments | Architecture comparison, augmentation | RunPod A100 ~8–12 hrs | $16–24 |
 | Final runs | Calibration, explainability | RunPod A100 ~4 hrs | $8 |

@@ -1,0 +1,30 @@
+[project]
+name = "chagas-ecg-explainability"
+version = "0.1.0"
+description = "Chagas disease detection from 12-lead ECG with explainability"
+requires-python = ">=3.11"
+dependencies = [
+    # Signal processing
+    "wfdb>=4.1",
+    "neurokit2>=0.2",
+    "scipy>=1.13",
+    # Deep learning
+    # torch>=2.3 dropped Intel Mac (x86_64) support — pin to last compatible version locally
+    # On RunPod (Linux): uv add torch --index https://download.pytorch.org/whl/cu121
+    "torch==2.2.2",
+    "pytorch-lightning>=2.3",
+    # Explainability
+    "captum>=0.7",
+    # Experiment tracking
+    "wandb>=0.17",
+    # Data / evaluation
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+    # Visualization
+    "matplotlib>=3.9",
+]
+
+[tool.uv]
+# On RunPod (Linux + CUDA), override torch source:
+# uv add torch --index https://download.pytorch.org/whl/cu121
