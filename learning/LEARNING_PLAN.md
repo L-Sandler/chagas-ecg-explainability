@@ -10,8 +10,8 @@ Each phase has a **goal** and a **done signal** — a concrete thing you should 
 
 When explaining any concept in this plan — clinical, signal-processing, architectural, or statistical — do not rely on training data alone. At the start of a teaching session for a given phase or topic:
 
-1. **Search for current academic sources** using web search. Prioritise, in order: peer-reviewed journal articles (PubMed, Nature, Lancet, JACC, NEJM, IEEE, etc.), official dataset or software papers, recent review articles (within the last 5 years where possible), and authoritative clinical bodies (WHO, AHA, ESC) for clinical facts.
-2. **Prefer recent sources.** For clinical cardiology and epidemiology, search for reviews from the past 5 years before falling back to older foundational papers. For ML methods, the original method paper plus any recent benchmark that uses it on ECG.
+1. **Search for current academic sources** using web search. Prioritise, in order: peer-reviewed journal articles (PubMed, Nature, Lancet, JACC, NEJM, IEEE, etc.), official dataset or software papers, recent review articles (within the last 5 years where possible), and authoritative clinical bodies (WHO, AHA, ESC) for clinical facts. **Always include the current year in search queries** (currently 2026) to surface the most recent results.
+2. **Prefer recent sources.** For clinical cardiology and epidemiology, search for reviews from 2021–2026 before falling back to older foundational papers. For ML methods, the original method paper plus any recent benchmark that uses it on ECG. If search results are returning pre-2022 sources, refine the query with a year range.
 3. **Cite every substantive claim** inline as you teach — author, year, and journal/venue at minimum. If a claim cannot be traced to a specific source found via search, flag it explicitly as unverified rather than stating it as fact.
 4. **Show the source link** when introducing a new paper so I can verify it myself.
 5. **Follow the teaching-style preference**: one concept at a time, short messages, end each with a single understanding-check question before moving on.
