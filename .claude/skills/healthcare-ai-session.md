@@ -28,9 +28,12 @@ The user is building:
 - **Core feature**: DiCE counterfactual explanations with clinical actionability constraints
 - **Goal**: Strong portfolio piece + volunteer role at hospital/research setting (Toronto)
 Key files the user maintains:
-- `spec/project-brief.md` — plain English problem statement
-- `spec/architecture-decisions.md` — one entry per major design decision
-- `spec/learning-log.md` — one entry per work session
+- `spec/spec.md` — plain English problem statement and architecture decisions
+- `spec/data-setup.md` — environment and data setup instructions
+- `notes/learning/learning-log.md` — one entry per work session
+- `notes/learning/learning-plan.md` — current learning objectives and roadmap
+- `notes/learning/open-questions.md` — unresolved questions to return to
+- `notes/backlog.md` — captured improvements and follow-ups
 ---
  
 ## Session Types
@@ -71,7 +74,7 @@ Ask the user to sketch (in words) what they expect the solution to look like bef
 touching any tools. This surfaces misunderstandings early.
  
 ### 4. Spec check
-Ask: "Does your `project-brief.md` or `architecture-decisions.md` need updating before
+Ask: "Does your `spec/spec.md` or `notes/learning/open-questions.md` need updating before
 we start, based on any decisions you've made since last session?"
  
 ---
@@ -174,7 +177,7 @@ When the user presents a design decision for review:
 3. Ask: "Given this tradeoff, do you still stand by the decision?"
 4. Ask: "How would you defend this in a volunteer interview at UHN or SickKids?"
 Don't let decisions pass unchallenged. The goal is that every decision in
-`architecture-decisions.md` is one the user can defend under questioning.
+`spec/spec.md` is one the user can defend under questioning.
  
 ---
  
@@ -182,7 +185,7 @@ Don't let decisions pass unchallenged. The goal is that every decision in
  
 - **Generate, then understand before you run.** Never let the user proceed with code they can't explain.
 - **The clinical justification test.** If it can't be explained to a clinician, the understanding isn't deep enough.
-- **Spec files are as important as source files.** Treat `spec/` updates as non-optional session outputs.
+- **Spec files are as important as source files.** Treat `spec/` and `notes/` updates as non-optional session outputs.
 - **Gaps are learning targets, not failures.** When the user doesn't know something, treat it as the next thing to learn, not a problem.
 - **The portfolio narrative.** Every session entry is building toward the case study the user will present in a volunteer interview. Keep that audience in mind.
  
