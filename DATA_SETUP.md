@@ -81,8 +81,12 @@ done
 
 Convert HDF5 → WFDB format using the challenge script:
 ```bash
-git clone https://github.com/physionetchallenges/python-example-2025.git
-uv run python python-example-2025/prepare_code15_data.py -i data/code15 -o data/code15/wfdb
+git clone --depth 1 https://github.com/physionetchallenges/python-example-2025.git
+uv run python python-example-2025/prepare_code15_data.py \
+  -i data/code15/exams_part0.hdf5 \
+  -d data/code15/exams.csv \
+  -l data/code15/code15_chagas_labels.csv \
+  -o data/code15/wfdb
 ```
 
 ---

@@ -23,6 +23,7 @@ dependencies = [
     "scikit-learn>=1.5",
     # Visualization
     "matplotlib>=3.9",
+    "h5py>=3.16.0",
 ]
 
 [tool.uv]

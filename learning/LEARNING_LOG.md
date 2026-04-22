@@ -18,6 +18,6 @@
 
 **Open question raised:** Whether the 40 Hz upper cutoff discards diagnostically relevant signal. Accepted as convention for now — Chagas-relevant features (RBBB, conduction delays) live well within 0–40 Hz. Logged in [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md).
 
-**Done signal status:** Pending — concepts complete, `preprocess_ecg` implementation not yet written.
+**Done signal status:** Complete — `preprocess_ecg` implemented in `src/preprocess.py`. Verified visually with `src/plot_preprocess.py` on a CODE-15% record. Output is `[12, 4000]` float32, z-scored per lead, baseline flat.
 
 ---
