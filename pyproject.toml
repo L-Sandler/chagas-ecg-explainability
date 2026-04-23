@@ -9,9 +9,10 @@ dependencies = [
     "neurokit2>=0.2",
     "scipy>=1.13",
     # Deep learning
-    # torch>=2.3 dropped Intel Mac (x86_64) support — pin to last compatible version locally
-    # On RunPod (Linux): uv add torch --index https://download.pytorch.org/whl/cu121
-    "torch==2.2.2",
+    # Intel Mac (x86_64) is stuck at 2.2.2 — torch>=2.3 dropped that platform.
+    # On RunPod (Linux + CUDA 12.1): uv pip install torch --index-url https://download.pytorch.org/whl/cu121
+    "torch==2.2.2; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "torch>=2.3; sys_platform != 'darwin' or platform_machine != 'x86_64'",
     "pytorch-lightning>=2.3",
     # Explainability
     "captum>=0.7",

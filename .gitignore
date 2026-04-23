@@ -4,3 +4,8 @@ data/
 python-example-2025/
 __pycache__/
 *.pyc
+
+# Training outputs
+lightning_logs/
+wandb/
+lightning_checkpoints/

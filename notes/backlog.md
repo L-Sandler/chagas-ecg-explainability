@@ -15,3 +15,8 @@ Items here are captured quickly during focused work. Triage regularly to keep th
 
 - [ ] **[RESEARCH]** Simulate tech review sessions with a sr engineer or clinician persona to defend every design decision
   - _Added: 2026-04-22 | Context: build depth of understanding, not just working code — prep for volunteer interviews_
+
+- [ ] **[INFRA]** Verify install from scratch and data source consistency
+  - Test a clean `uv sync` + install to catch any missing or mis-pinned deps
+  - Audit whether preprocessing is applied consistently across CODE-15% (HDF5), SaMi-Trop (WFDB), and PTB-XL (WFDB) — currently `Code15Dataset` does inline normalization while `WFDBDataset` delegates to `preprocess_ecg`; confirm the same steps (bandpass, resample, clip, z-score) apply to all three or document intentional differences
+  - _Added: 2026-04-23 | Context: raised during first training run_
