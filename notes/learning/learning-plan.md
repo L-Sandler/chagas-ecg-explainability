@@ -15,6 +15,9 @@ When explaining any concept in this plan — clinical, signal-processing, archit
 3. **Cite every substantive claim** inline as you teach — author, year, and journal/venue at minimum. If a claim cannot be traced to a specific source found via search, flag it explicitly as unverified rather than stating it as fact.
 4. **Show the source link** when introducing a new paper so I can verify it myself.
 5. **Follow the teaching-style preference**: one concept at a time, short messages, end each with a single understanding-check question before moving on.
+6. **Suggest prereading at the start of each phase** — recommend 1–2 short resources (one visual/interactive, optionally one paper skim). Target under 30 minutes total. Specify what to focus on (e.g., "skim the Methods section only") so reading has a purpose. Do not assign prereading mid-phase.
+
+7. **Treat the spec and learning plan as a starting point, not a constraint.** The architecture and tooling choices (1D ResNet, SE blocks, PatchTST, W&B, RunPod, etc.) were made as reasonable defaults. Flag meaningful alternatives when they arise — better architectures, newer benchmarks, simpler approaches — rather than teaching to the spec as if it were fixed.
 
 If a search returns nothing recent or relevant, say so rather than filling the gap with training-data recall.
 
@@ -118,6 +121,10 @@ Write a function `preprocess_ecg(path) -> np.ndarray` that reads a WFDB record, 
 
 ## Phase 3 — 1D Deep Learning for ECG
 **Time: 3–4 days**
+
+### Prereading (~25 min)
+- **[CNN Explainer](https://poloclub.github.io/cnn-explainer/)** (~15 min) — interactive, runs in browser. Focus on: what a kernel does spatially, what stride does to output size, how pooling shrinks dimensions. Everything in this phase is a 1D version of this.
+- **[Ribeiro et al. 2020, Methods section only](https://www.nature.com/articles/s41467-020-15432-4)** (~10 min skim) — the architecture you're building a variant of. Look at Figure 1 and the residual block description. Skip the clinical results.
 
 You know 2D CNNs and transformers. This phase is the adaptation to 1D temporal signals.
 
