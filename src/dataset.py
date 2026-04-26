@@ -8,13 +8,12 @@ CODE-15% HDF5 layout (each exams_partN.hdf5):
 Labels come from a separate CSV with columns: exam_id, chagas (bool).
 """
 
-import numpy as np
 import pandas as pd
 import h5py
 import torch
 from torch.utils.data import Dataset
 
-from preprocess import preprocess_ecg, TARGET_LEN
+from preprocess import preprocess_ecg, preprocess_signal, CODE15_LEAD_ORDER
 
 
 class Code15Dataset(Dataset):
@@ -77,22 +76,7 @@ class Code15Dataset(Dataset):
 
         f = self._get_hdf5()
         signal = f["tracings"][pos]  # [T, 12], float32
-
-        signal = signal.T  # [12, T]
-        signal = np.clip(signal, -5.0, 5.0)
-
-        # Fix length to TARGET_LEN (4000)
-        if signal.shape[1] >= TARGET_LEN:
-            signal = signal[:, :TARGET_LEN]
-        else:
-            pad = TARGET_LEN - signal.shape[1]
-            signal = np.pad(signal, ((0, 0), (0, pad)))
-
-        # Per-lead z-score
-        mean = signal.mean(axis=1, keepdims=True)
-        std = signal.std(axis=1, keepdims=True)
-        std[std < 1e-6] = 1.0
-        signal = (signal - mean) / std
+        signal = preprocess_signal(signal, fs=400.0, sig_names=CODE15_LEAD_ORDER)  # [12, 4000]
 
         label = float(row["chagas"])
         return torch.from_numpy(signal), torch.tensor(label, dtype=torch.float32)
