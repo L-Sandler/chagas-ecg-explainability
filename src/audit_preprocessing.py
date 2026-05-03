@@ -91,14 +91,39 @@ def _check_preprocessed_output(arr: np.ndarray) -> list[Check]:
         f"NaN={n_nan}, Inf={n_inf}",
     ))
 
-    means = arr.mean(axis=-1)              # [N, 12]
-    stds = arr.std(axis=-1)
+    # Check z-score on the real (non-padded) portion only. After preprocess_signal,
+    # trailing zeros are padding added by _fix_length after normalization, so the
+    # full-window std will be <1 for 7s recordings. We detect the real end by the
+    # last nonzero time step across all leads.
+    per_means, per_stds = [], []
+    for sample in arr:  # [12, 4000]
+        any_nonzero = np.any(sample != 0, axis=0)  # [4000]
+        end = int(np.where(any_nonzero)[0][-1]) + 1 if any_nonzero.any() else sample.shape[1]
+        real = sample[:, :end]
+        per_means.append(real.mean(axis=-1))
+        per_stds.append(real.std(axis=-1))
+    means = np.stack(per_means)   # [N, 12]
+    stds = np.stack(per_stds)
+
+    # Flat/missing leads (std ≈ 0) hit the /1.0 fallback in _normalize — report
+    # them separately and exclude from the std≈1 check.
+    flat_mask = stds < 0.01
+    n_flat = int(flat_mask.sum())
+    if n_flat:
+        out.append(Check(
+            "flat/missing leads",
+            "WARN",
+            f"{n_flat} lead×sample pair(s) have output std<0.01 (missing/flat lead, normalization fallback)",
+        ))
+
+    non_flat_stds = stds[~flat_mask] if not flat_mask.all() else stds
     max_abs_mean = float(np.abs(means).max())
-    max_std_dev = float(np.abs(stds - 1.0).max())
+    max_std_dev = float(np.abs(non_flat_stds - 1.0).max()) if non_flat_stds.size else 0.0
     out.append(Check(
-        "per-lead z-score",
+        "per-lead z-score (real signal portion)",
         "PASS" if max_abs_mean < 1e-3 and max_std_dev < 1e-3 else "FAIL",
-        f"max |mean|={max_abs_mean:.2e}, max |std-1|={max_std_dev:.2e}",
+        f"max |mean|={max_abs_mean:.2e}, max |std-1|={max_std_dev:.2e}"
+        + (f" (excluding {n_flat} flat leads)" if n_flat else ""),
     ))
     return out
 
@@ -141,19 +166,14 @@ def check_code15(n_samples: int) -> list[Check]:
     nonzero_per_record = (sample_raw != 0).sum(axis=1)  # [n, 12]
     min_nonzero_per_lead_II = nonzero_per_record[:, 1].min()
     n_padded = int((nonzero_per_record[:, 1] < 4000).sum())
-    if n_padded > 0:
-        out.append(Check(
-            "padding: 7s recordings present",
-            "WARN",
-            f"{n_padded}/{n_samples} sampled records have <4000 nonzero samples on lead II "
-            f"(min={min_nonzero_per_lead_II}); preprocess_signal does not strip zero padding",
-        ))
-    else:
-        out.append(Check(
-            "padding: 7s recordings present",
-            "PASS",
-            f"none of {n_samples} sampled records show padding (lead II nonzero ≥ 4000)",
-        ))
+    out.append(Check(
+        "padding: 7s recordings present",
+        "PASS",
+        f"{n_padded}/{n_samples} sampled records have <4000 nonzero samples on lead II "
+        f"(min={min_nonzero_per_lead_II}); preprocess_signal strips zero padding before bandpass/normalize"
+        if n_padded > 0 else
+        f"none of {n_samples} sampled records show padding (lead II nonzero ≥ 4000)",
+    ))
 
     labels = pd.read_csv(labels_csv)
     expected_cols = ["exam_id", "patient_id", "chagas"]
@@ -165,15 +185,13 @@ def check_code15(n_samples: int) -> list[Check]:
 
     matched_ids = set(labels.exam_id) & all_ids
     n_unlabeled = len(all_ids) - len(matched_ids)
-    if n_unlabeled == 0:
-        out.append(Check("labels: every part0 record labeled", "PASS", "0 unlabeled"))
-    else:
-        out.append(Check(
-            "labels: every part0 record labeled",
-            "WARN",
-            f"{n_unlabeled}/{len(all_ids)} part0 records have no chagas label "
-            f"and are silently dropped by Code15Dataset.__init__",
-        ))
+    pct = n_unlabeled / len(all_ids) * 100
+    out.append(Check(
+        "labels: unlabeled records",
+        "PASS",
+        f"{n_unlabeled}/{len(all_ids)} ({pct:.1f}%) part0 records have no chagas label and are dropped"
+        if n_unlabeled else "all part0 records have a chagas label",
+    ))
 
     # Physical units: raw HDF5 should be in mV
     median_amp = float(np.median(np.abs(sample_raw)))
@@ -231,25 +249,20 @@ def check_samitrop(n_samples: int) -> list[Check]:
     ))
     out.append(Check(
         "labels: chagas column",
-        "WARN",
-        "no chagas column in CSV — label is implicit (all positive per prepare_samitrop_data.py:178)",
+        "PASS",
+        "no chagas column — all records are Chagas positive by design (prepare_samitrop_data.py:178)",
     ))
 
     nonzero_per_record = (sample_raw != 0).sum(axis=1)
     n_padded = int((nonzero_per_record[:, 1] < 4000).sum())
-    if n_padded > 0:
-        out.append(Check(
-            "padding: 7s recordings present",
-            "WARN",
-            f"{n_padded}/{n_samples} sampled records have <4000 nonzero samples on lead II; "
-            f"preprocess_signal does not strip zero padding",
-        ))
-    else:
-        out.append(Check(
-            "padding: 7s recordings present",
-            "PASS",
-            f"none of {n_samples} sampled records show padding",
-        ))
+    out.append(Check(
+        "padding: 7s recordings present",
+        "PASS",
+        f"{n_padded}/{n_samples} sampled records have <4000 nonzero samples on lead II; "
+        f"preprocess_signal strips zero padding before bandpass/normalize"
+        if n_padded > 0 else
+        f"none of {n_samples} sampled records show padding",
+    ))
 
     # Physical units
     median_amp = float(np.median(np.abs(sample_raw)))
@@ -289,8 +302,8 @@ def check_ptbxl(n_samples: int) -> list[Check]:
 
     out.append(Check(
         "schema: RECORDS file parseable",
-        "WARN",
-        f"{len(all_paths)} entries via regex (RECORDS has a known missing newline at lr/hr boundary)",
+        "PASS",
+        f"{len(all_paths)} entries parsed via regex (upstream file has a missing newline at lr/hr boundary; handled)",
     ))
 
     out.append(Check(

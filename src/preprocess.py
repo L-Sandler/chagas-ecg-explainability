@@ -13,6 +13,15 @@ CODE15_LEAD_ORDER = ["I", "II", "III", "AVR", "AVL", "AVF", "V1", "V2", "V3", "V
 SAMITROP_LEAD_ORDER = ["I", "II", "III", "AVR", "AVL", "AVF", "V1", "V2", "V3", "V4", "V5", "V6"]
 
 
+def _strip_zero_padding(signal: np.ndarray) -> np.ndarray:
+    """Remove trailing zero rows (7s recordings zero-padded to 4096 in HDF5)."""
+    nonzero_rows = np.any(signal != 0, axis=1)
+    if not nonzero_rows.any():
+        return signal
+    last = int(np.where(nonzero_rows)[0][-1]) + 1
+    return signal[:last]
+
+
 def _bandpass(signal: np.ndarray, fs: float) -> np.ndarray:
     b, a = butter(4, [0.5, 40.0], btype="band", fs=fs)
     return filtfilt(b, a, signal, axis=0)
@@ -62,10 +71,15 @@ def preprocess_signal(signal: np.ndarray, fs: float, sig_names: list[str]) -> np
     """
     signal = signal.astype(np.float64)
     signal = _reorder_leads(signal, sig_names)
+    signal = _strip_zero_padding(signal)
     signal = _bandpass(signal, fs)
     signal = _resample_to_target(signal, fs)
-    signal = _fix_length(signal)
+    # Truncate first so normalization stats are computed over exactly the kept samples.
+    # Padding (for 7s recordings) comes after normalization so zeros == mean.
+    if signal.shape[0] > TARGET_LEN:
+        signal = signal[:TARGET_LEN]
     signal = _normalize(signal)
+    signal = _fix_length(signal)  # only pads here; truncation already done above
     return signal.T.astype(np.float32)  # [12, 4000]
 
 

@@ -28,5 +28,11 @@ dependencies = [
 ]
 
 [tool.uv]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.2.0",
+    "jupyter>=1.1.1",
+]
 # On RunPod (Linux + CUDA), override torch source:
 # uv add torch --index https://download.pytorch.org/whl/cu121

@@ -32,11 +32,14 @@ Items here are captured quickly during focused work. Triage regularly to keep th
   - For CODE-15%: group-stratified split on `patient_id` with `chagas` as the strat target
   - _Added: 2026-04-25 | Context: surfaced when reviewing data setup_
 
-- [ ] **[BUG]** Variable-length recordings keep zero-padding through preprocessing
-  - CODE-15% and SaMi-Trop store recordings as 7s OR 10s padded to 4096 samples (per Zenodo docs and audit measurements: 5/10 sampled CODE-15% records had <4000 nonzero samples on lead II)
-  - `preprocess_signal` truncates to 4000 samples but does not strip leading/trailing zero padding → bandpass + z-score distort the padded region; `prepare_code15_data.py:188` strips this padding before WFDB conversion
-  - Decision needed: replicate the padding-strip step inside `preprocess_signal`, OR pre-strip in the dataset class, OR skip 7s recordings entirely
-  - _Added: 2026-04-25 | Context: surfaced during data integrity audit_
+- [x] **[BUG]** Variable-length recordings keep zero-padding through preprocessing
+  - _Fixed: 2026-05-02 | `_strip_zero_padding` added to `preprocess_signal`; truncation now happens before normalization so z-score stats reflect only real cardiac signal_
+
+- [ ] **[INFRA]** Experiment tracking for GPU training runs
+  - W&B integration already exists (`--wandb` flag in `train.py`), but there's no run naming, config logging, or artifact saving strategy
+  - Before RunPod: set `WANDB_API_KEY` in the environment, decide on project/group naming convention, log `pos_weight` and dataset sizes as config, save best checkpoint as a W&B artifact
+  - Consider adding `--run-name` arg so parallel hyperparameter sweeps are distinguishable
+  - _Added: 2026-05-02 | Context: want reproducible experiment history before first real GPU training run_
 
 - [ ] **[BUG]** Silent label drop in `Code15Dataset.__init__`
   - 62 of 20,001 CODE-15% part0 records have no entry in `code15_chagas_labels.csv` and are silently dropped by the inner-join filter at `dataset.py:44`. They never appear in train or val

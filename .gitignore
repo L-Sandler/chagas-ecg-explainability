@@ -1,11 +1,21 @@
 .claude/*
 !.claude/skills/
+
+# Raw datasets (too large for git)
 data/
 python-example-2025/
+
+# Python
 __pycache__/
 *.pyc
+.venv/
 
 # Training outputs
 lightning_logs/
 wandb/
 lightning_checkpoints/
+
+# Generated report data — large per-record scan CSVs and rendered figures.
+# quality_summary.csv is intentionally kept (small, human-readable).
+reports/*_scan*.csv
+reports/figures/
