@@ -11,10 +11,18 @@ Smoke test (CPU):
     python src/train.py \
         --hdf5 data/code15/exams_part0.hdf5 \
         --labels data/code15/code15_chagas_labels.csv \
-        --fast --epochs 5 --batch-size 32
+        --fast --epochs 2 --batch-size 32
+
+GPU (e.g. RunPod with a single A100):
+    python src/train.py \
+        --hdf5 data/code15/exams_part0.hdf5 \
+        --labels data/code15/code15_chagas_labels.csv \
+        --epochs 20 --batch-size 256 \
+        --accelerator gpu --devices 1 --num-workers 4 --amp
 
 Optional:
-    --wandb    enable W&B logging
+    --wandb        enable W&B logging
+    --eval-test    run held-out test set evaluation after training
 """
 
 import argparse
@@ -28,7 +36,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, TQDMProgressBar
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, average_precision_score
 import numpy as np
 
 from model import ECGResNet
@@ -75,8 +83,10 @@ class ECGLightningModule(pl.LightningModule):
             return
 
         auroc = roc_auc_score(labels, probs)
+        auprc = average_precision_score(labels, probs)
         tpr_at_5 = _tpr_at_fpr(labels, probs, fpr_target=0.05)
         self.log("val/auroc", auroc, prog_bar=True)
+        self.log("val/auprc", auprc, prog_bar=True)
         self.log("val/tpr_at_5pct", tpr_at_5, prog_bar=True)
 
     def configure_optimizers(self):
@@ -92,36 +102,86 @@ def _tpr_at_fpr(labels: np.ndarray, probs: np.ndarray, fpr_target: float) -> flo
     return float(tpr[mask].max()) if mask.any() else 0.0
 
 
+def _eval_test(module: ECGLightningModule, test_ds: Code15Dataset, batch_size: int, num_workers: int, accelerator: str) -> None:
+    """Run one pass over the held-out test set and print metrics."""
+    loader = DataLoader(
+        test_ds, batch_size=batch_size, shuffle=False,
+        num_workers=num_workers,
+        pin_memory=(accelerator == "gpu"),
+    )
+    device = torch.device("cuda" if accelerator == "gpu" and torch.cuda.is_available() else "cpu")
+    module.model.eval()
+    module.model.to(device)
+    all_preds, all_labels = [], []
+    with torch.no_grad():
+        for x, y in loader:
+            x = x.to(device)
+            logits = module.model(x)
+            all_preds.append(torch.sigmoid(logits).cpu())
+            all_labels.append(y)
+
+    probs = torch.cat(all_preds).numpy()
+    labels = torch.cat(all_labels).numpy()
+
+    print("\n=== TEST SET RESULTS ===")
+    print(f"  samples:     {len(labels)}")
+    print(f"  positives:   {int(labels.sum())} ({labels.mean()*100:.1f}%)")
+    if labels.sum() > 0:
+        print(f"  AUROC:       {roc_auc_score(labels, probs):.4f}")
+        print(f"  AUPRC:       {average_precision_score(labels, probs):.4f}")
+        print(f"  TPR@5%FPR:   {_tpr_at_fpr(labels, probs, 0.05):.4f}")
+    else:
+        print("  (no positives in test set — metrics not meaningful)")
+    print("========================\n")
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--hdf5", required=True)
+    parser.add_argument("--hdf5", required=True, nargs="+",
+                        help="One or more CODE-15% HDF5 part files. "
+                             "Pass all 18 parts for full training; part0 alone for prototyping.")
     parser.add_argument("--labels", required=True)
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--accelerator", default="auto",
+                        help="'auto' | 'gpu' | 'cpu'  (passed to Lightning Trainer)")
+    parser.add_argument("--devices", type=int, default=1,
+                        help="Number of GPUs (or CPUs if accelerator=cpu)")
+    parser.add_argument("--num-workers", type=int, default=0,
+                        help="DataLoader workers. 0=safe on all platforms; 4+ recommended on GPU")
+    parser.add_argument("--amp", action="store_true",
+                        help="Enable 16-bit mixed precision (requires CUDA; ~40%% memory savings)")
     parser.add_argument("--wandb", action="store_true")
-    parser.add_argument("--fast", action="store_true", help="200 train / 50 val samples (CPU smoke test)")
+    parser.add_argument("--fast", action="store_true",
+                        help="200 train / 50 val samples (CPU smoke test)")
+    parser.add_argument("--eval-test", action="store_true",
+                        help="Run held-out test split after training and print metrics")
     args = parser.parse_args()
+
+    # Resolve effective accelerator for pin_memory decisions
+    _gpu_available = torch.cuda.is_available()
+    _effective_gpu = args.accelerator == "gpu" or (args.accelerator == "auto" and _gpu_available)
 
     max_train = 200 if args.fast else None
     max_val = 50 if args.fast else None
 
-    train_ds = Code15Dataset(args.hdf5, args.labels, split="train", max_samples=max_train)
-    val_ds = Code15Dataset(args.hdf5, args.labels, split="val", max_samples=max_val)
+    hdf5_paths = args.hdf5  # already a list due to nargs="+"
+    train_ds = Code15Dataset(hdf5_paths, args.labels, split="train", max_samples=max_train)
+    val_ds   = Code15Dataset(hdf5_paths, args.labels, split="val",   max_samples=max_val)
 
+    print(f"HDF5 parts loaded: {len(hdf5_paths)}")
     print(f"Train: {len(train_ds)} samples  |  Val: {len(val_ds)} samples")
     print(f"Pos weight (from train split): {train_ds.pos_weight():.1f}")
+    print(f"Accelerator: {args.accelerator}  |  AMP: {args.amp}  |  Workers: {args.num_workers}")
 
-    train_loader = DataLoader(
-        train_ds, batch_size=args.batch_size, shuffle=True,
-        num_workers=0,  # 0 keeps HDF5 file handle in main process; safe on all platforms
-        pin_memory=False,
+    loader_kwargs = dict(
+        num_workers=args.num_workers,
+        pin_memory=_effective_gpu,
+        persistent_workers=(args.num_workers > 0),
     )
-    val_loader = DataLoader(
-        val_ds, batch_size=args.batch_size, shuffle=False,
-        num_workers=0,
-        pin_memory=False,
-    )
+    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,  **loader_kwargs)
+    val_loader   = DataLoader(val_ds,   batch_size=args.batch_size, shuffle=False, **loader_kwargs)
 
     module = ECGLightningModule(pos_weight=train_ds.pos_weight(), lr=args.lr)
 
@@ -141,8 +201,13 @@ def main():
 
     torch.set_float32_matmul_precision("high")
 
+    precision = "16-mixed" if args.amp else "32-true"
+
     trainer = pl.Trainer(
         max_epochs=args.epochs,
+        accelerator=args.accelerator,
+        devices=args.devices,
+        precision=precision,
         callbacks=callbacks,
         logger=loggers if loggers else True,
         log_every_n_steps=1,
@@ -150,6 +215,10 @@ def main():
     )
 
     trainer.fit(module, train_loader, val_loader)
+
+    if args.eval_test:
+        test_ds = Code15Dataset(hdf5_paths, args.labels, split="test")
+        _eval_test(module, test_ds, args.batch_size, args.num_workers, args.accelerator)
 
 
 if __name__ == "__main__":

@@ -501,6 +501,49 @@ def check_pre_fix_vs_post_fix() -> list[Check]:
     return out
 
 
+def check_split_leakage() -> list[Check]:
+    """
+    Verify that the patient-level 70/15/15 splits have zero patient overlap.
+    Instantiates all three splits in-memory; does NOT open HDF5 (label CSV only).
+    """
+    hdf5 = "data/code15/exams_part0.hdf5"
+    labels_csv = "data/code15/code15_chagas_labels.csv"
+    if not (os.path.exists(hdf5) and os.path.exists(labels_csv)):
+        return [Check("split leakage", "SKIP", f"missing {hdf5} or {labels_csv}")]
+
+    import sys
+    sys.path.insert(0, os.path.dirname(__file__))
+    from dataset import Code15Dataset
+
+    out = []
+    splits: dict[str, set] = {}
+    counts: dict[str, dict] = {}
+    for name in ("train", "val", "test"):
+        ds = Code15Dataset(hdf5, labels_csv, split=name)
+        splits[name] = set(ds.df["patient_id"])
+        counts[name] = {
+            "exams": len(ds.df),
+            "pos": int(ds.df["chagas"].sum()),
+            "pct": ds.df["chagas"].mean() * 100,
+        }
+        out.append(Check(
+            f"split {name}: size and prevalence",
+            "PASS",
+            f"{counts[name]['exams']} exams, "
+            f"{counts[name]['pos']} pos ({counts[name]['pct']:.1f}%)",
+        ))
+
+    for a, b in [("train", "val"), ("train", "test"), ("val", "test")]:
+        overlap = splits[a] & splits[b]
+        out.append(Check(
+            f"split leakage: {a} ∩ {b} patients",
+            "PASS" if not overlap else "FAIL",
+            f"0 shared patients" if not overlap else f"{len(overlap)} patients appear in both splits",
+        ))
+
+    return out
+
+
 def check_determinism(n_samples: int) -> list[Check]:
     """
     Same input through preprocess_signal twice should be byte-identical.
@@ -539,6 +582,7 @@ def main():
         ("Bandpass filter response (synthetic, fs=400)", check_bandpass()),
         ("Pre-fix vs post-fix preprocessing (step C)",    check_pre_fix_vs_post_fix()),
         ("Preprocess determinism",                       check_determinism(n)),
+        ("Patient-level split leakage (CODE-15%)",       check_split_leakage()),
     ]
 
     counts = {"PASS": 0, "FAIL": 0, "WARN": 0, "SKIP": 0}

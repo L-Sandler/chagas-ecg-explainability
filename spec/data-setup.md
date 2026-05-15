@@ -33,6 +33,23 @@ uv run python src/preprocess.py
 
 ---
 
+## Local data inventory (as of 2026-05-15)
+
+| Path | Size | Status |
+|---|---|---|
+| `data/code15/exams_part0.hdf5` | 3.7 GB | ✅ Downloaded — sufficient for local prototyping |
+| `data/code15/exams_part1–17.hdf5` | ~63 GB total | ❌ Not downloaded — get on RunPod for full training |
+| `data/code15/code15_chagas_labels.csv` | 6.8 MB | ✅ Downloaded (covers all 18 parts) |
+| `data/code15/exams.csv` | 34 MB | ✅ Downloaded (Zenodo metadata, not used by training) |
+| `data/code15/wfdb/` | 1.6 GB | ✅ Downloaded — 19,901 WFDB records converted from part0. Not used by current training code (HDF5 path only). |
+| `data/samitrop/exams.hdf5` | 612 MB | ✅ Complete (1,631 records) |
+| `data/samitrop/exams.csv` | 86 KB | ✅ Downloaded |
+| `data/ptbxl/` | 3.2 GB | ✅ Complete (21,799 recordings × 2 resolutions) |
+
+**Why only part0 locally:** All 18 CODE-15% parts are ~67 GB. Part0 alone gives 403 positives (6% of total 6,561) — enough to verify the full pipeline. Download the remaining 17 parts on RunPod when ready for a production training run (see `spec/gpu-setup.md`).
+
+---
+
 ## Directory layout
 
 ```
