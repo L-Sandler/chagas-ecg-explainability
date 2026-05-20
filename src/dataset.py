@@ -1,5 +1,5 @@
 """
-Datasets for CODE-15% (HDF5) and SaMi-Trop / PTB-XL (WFDB).
+Datasets for CODE-15% (HDF5), SaMi-Trop (HDF5), and PTB-XL (WFDB).
 
 CODE-15% HDF5 layout (each exams_partN.hdf5):
     exam_id:  int64[N]          — exam IDs
@@ -14,7 +14,21 @@ for local prototyping.
 Splitting strategy: patient-level stratified 70/15/15 (train/val/test).
 A fixed seed (42) is baked in so splits are reproducible across runs without
 a saved manifest. No patient appears in more than one split.
+
+SaMi-Trop HDF5 layout (exams.hdf5):
+    tracings: float64[1631, 4096, 12] — all records Chagas-positive (serologically
+    confirmed). No exam_id key; row index aligns with rows in exams.csv.
+    All 1,631 records are used for training only — too small to split and
+    withholding confirmed positives from training is not warranted.
+
+PTB-XL uses the official strat_fold split (Wagner et al. 2020):
+    folds 1–8 = train, 9 = val, 10 = test.
+    All records are treated as Chagas-negative (geographic assumption, same as
+    the PhysioNet 2025 challenge). Records read from records100/ (100 Hz WFDB),
+    resampled to 400 Hz by preprocess_ecg.
 """
+
+import os
 
 import pandas as pd
 import numpy as np
@@ -23,7 +37,7 @@ import torch
 from torch.utils.data import Dataset
 from sklearn.model_selection import train_test_split
 
-from preprocess import preprocess_ecg, preprocess_signal, CODE15_LEAD_ORDER
+from preprocess import preprocess_ecg, preprocess_signal, CODE15_LEAD_ORDER, SAMITROP_LEAD_ORDER
 
 _SPLIT_SEED = 42
 
@@ -137,35 +151,78 @@ class Code15Dataset(Dataset):
         return torch.from_numpy(signal), torch.tensor(label, dtype=torch.float32)
 
 
-class WFDBDataset(Dataset):
+class SamiTropDataset(Dataset):
     """
-    Generic WFDB dataset (SaMi-Trop or PTB-XL).
+    SaMi-Trop dataset backed by exams.hdf5.
 
-    records_csv: CSV with columns 'path' (WFDB record path, no extension) and 'chagas'
-    split:       'train' | 'val' | 'test' — index-based 70/15/15
+    All 1,631 records are serologically confirmed Chagas-positive; label is
+    hardcoded to 1.0 (no chagas column exists in the CSV).
+
+    The HDF5 has no exam_id key — row index aligns with rows in exams.csv.
+    All records are used for training; the dataset is too small to split and
+    withholding confirmed positives from training is not warranted.
+
+    HDF5 handles are opened lazily per DataLoader worker so that forked
+    processes each hold their own file descriptor.
+
+    hdf5_path: path to exams.hdf5
     """
 
-    def __init__(self, records_csv: str, split: str = "train"):
-        if split not in ("train", "val", "test"):
+    def __init__(self, hdf5_path: str):
+        self.hdf5_path = hdf5_path
+        with h5py.File(hdf5_path, "r") as f:
+            self._len = f["tracings"].shape[0]
+        self._hdf5_handle: h5py.File | None = None
+
+    def _get_hdf5(self) -> h5py.File:
+        if self._hdf5_handle is None:
+            self._hdf5_handle = h5py.File(self.hdf5_path, "r")
+        return self._hdf5_handle
+
+    def __len__(self) -> int:
+        return self._len
+
+    def __getitem__(self, idx):
+        signal = self._get_hdf5()["tracings"][idx]  # [4096, 12], float64
+        signal = preprocess_signal(signal, fs=400.0, sig_names=SAMITROP_LEAD_ORDER)
+        return torch.from_numpy(signal), torch.tensor(1.0, dtype=torch.float32)
+
+
+class PTBXLDataset(Dataset):
+    """
+    PTB-XL dataset for Chagas-negative training and evaluation.
+
+    All records are treated as Chagas-negative (label=0.0). Uses the official
+    strat_fold split from the PTB-XL paper (Wagner et al. 2020) to respect
+    patient grouping: folds 1–8 = train, 9 = val, 10 = test.
+
+    Records are read from records100/ (100 Hz WFDB) and resampled to 400 Hz
+    by preprocess_ecg.
+
+    ptbxl_root: directory containing ptbxl_database.csv and records100/
+    split:      'train' | 'val' | 'test'
+    """
+
+    _FOLD_MAP: dict[str, tuple[int, ...]] = {
+        "train": tuple(range(1, 9)),
+        "val":   (9,),
+        "test":  (10,),
+    }
+
+    def __init__(self, ptbxl_root: str, split: str = "train"):
+        if split not in self._FOLD_MAP:
             raise ValueError(f"split must be 'train', 'val', or 'test'; got {split!r}")
 
-        df = pd.read_csv(records_csv)
-        n = len(df)
-        train_end = int(n * 0.70)
-        val_end   = int(n * 0.85)
+        self.ptbxl_root = ptbxl_root
+        db = pd.read_csv(os.path.join(ptbxl_root, "ptbxl_database.csv"))
+        folds = self._FOLD_MAP[split]
+        self.df = db[db["strat_fold"].isin(folds)].reset_index(drop=True)
 
-        if split == "train":
-            self.df = df.iloc[:train_end].reset_index(drop=True)
-        elif split == "val":
-            self.df = df.iloc[train_end:val_end].reset_index(drop=True)
-        else:
-            self.df = df.iloc[val_end:].reset_index(drop=True)
-
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.df)
 
     def __getitem__(self, idx):
-        row = self.df.iloc[idx]
-        signal = preprocess_ecg(row["path"])  # [12, 4000] float32
-        label = float(row["chagas"])
-        return torch.from_numpy(signal), torch.tensor(label, dtype=torch.float32)
+        rel_path = self.df.iloc[idx]["filename_lr"]  # e.g. records100/00000/00001_lr
+        full_path = os.path.join(self.ptbxl_root, rel_path)
+        signal = preprocess_ecg(full_path)  # [12, 4000], 100→400 Hz resampling in preprocess_ecg
+        return torch.from_numpy(signal), torch.tensor(0.0, dtype=torch.float32)

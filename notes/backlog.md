@@ -20,20 +20,17 @@ Items here are captured quickly during focused work. Triage regularly to keep th
   - Test a clean `uv sync` + install on a fresh machine to catch missing or mis-pinned deps
   - _Added: 2026-04-23 | Context: split off from the broader "data + install" backlog item once data consistency was verified separately_
 
-- [ ] **[BUG]** Wire SaMi-Trop and PTB-XL into training
-  - `train.py` only loads `Code15Dataset`; the project's "multi-source training" framing isn't realized yet
-  - SaMi-Trop is HDF5 (`exams.hdf5`, no `exam_id` key, label implicit-positive per `prepare_samitrop_data.py:178`); needs its own dataset class — `WFDBDataset` does not work for it
-  - PTB-XL is WFDB but has no chagas column; label is implicit-negative per `prepare_ptbxl_data.py:132`. Needs a manifest CSV + adapter
-  - _Added: 2026-04-25 | Context: surfaced during data integrity audit_
+- [x] **[BUG]** Wire SaMi-Trop and PTB-XL into training
+  - _Fixed: 2026-05-19 | `SamiTropDataset` and `PTBXLDataset` added to `dataset.py`; `train.py` wired with `--samitrop` and `--ptbxl` flags via `ConcatDataset`. `WFDBDataset` removed (was unused and used wrong split strategy)._
 
-- [ ] **[BUG]** Stratified splitting (chagas label + patient_id)
-  - Current 90/10 split in `Code15Dataset` and `WFDBDataset` is positional (`iloc[:cutoff]`). With ~2% positivity, val class balance is high-variance. CODE-15% labels CSV has `patient_id`, so the same patient can appear in both splits → leakage
-  - PTB-XL ships a `strat_fold` column (10-fold CV) — use it directly
-  - For CODE-15%: group-stratified split on `patient_id` with `chagas` as the strat target
-  - _Added: 2026-04-25 | Context: surfaced when reviewing data setup_
+- [x] **[BUG]** Stratified splitting (chagas label + patient_id)
+  - _Fixed (prior to 2026-05-19) | `_patient_level_splits()` in `dataset.py` implements patient-level stratified 70/15/15 with seed 42. Zero patient overlap verified by `check_split_leakage()` in `audit_preprocessing.py`. PTB-XL uses official `strat_fold` (folds 1–8/9/10)._
 
 - [x] **[BUG]** Variable-length recordings keep zero-padding through preprocessing
   - _Fixed: 2026-05-02 | `_strip_zero_padding` added to `preprocess_signal`; truncation now happens before normalization so z-score stats reflect only real cardiac signal_
+
+- [x] **[BUG]** `--fast` smoke test didn't cap auxiliary datasets
+  - _Fixed: 2026-05-19 | Aux datasets (SaMi-Trop, PTB-XL) are skipped when `--fast` is set. Fast mode is for verifying the CODE-15% pipeline path only; aux sources add 19k records and make the "smoke test" take 22 min on CPU._
 
 - [ ] **[INFRA]** Experiment tracking for GPU training runs
   - W&B integration already exists (`--wandb` flag in `train.py`), but there's no run naming, config logging, or artifact saving strategy
