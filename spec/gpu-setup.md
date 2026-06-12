@@ -36,11 +36,17 @@ uv sync
 uv run python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
 ```
 
-If `torch.cuda.is_available()` returns `False`, install the CUDA wheel explicitly:
+If `torch.cuda.is_available()` returns `False`, `uv sync` installed the CPU wheel from PyPI (the lock file source). Re-install with the CUDA wheel matching your driver:
 
 ```bash
-uv add torch --index https://download.pytorch.org/whl/cu121
+# Check your CUDA driver version first:
+nvidia-smi | grep "CUDA Version"
+
+# Install the matching wheel, e.g. for CUDA 12.4:
+uv add torch --index https://download.pytorch.org/whl/cu124
 ```
+
+The locked torch version is **2.11.0** (Linux). Pick the `cuXXX` index that matches your driver — don't assume `cu121`.
 
 ---
 
