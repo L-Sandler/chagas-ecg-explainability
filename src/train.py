@@ -30,6 +30,7 @@ Optional:
 """
 
 import argparse
+import subprocess
 import sys
 import os
 
@@ -88,10 +89,12 @@ class ECGLightningModule(pl.LightningModule):
 
         auroc = roc_auc_score(labels, probs)
         auprc = average_precision_score(labels, probs)
-        tpr_at_5 = _tpr_at_fpr(labels, probs, fpr_target=0.05)
+        tpr_at_5_fpr = _tpr_at_fpr(labels, probs, fpr_target=0.05)
+        tpr_top5pct = _tpr_at_top_k(labels, probs, k_frac=0.05)
         self.log("val/auroc", auroc, prog_bar=True)
         self.log("val/auprc", auprc, prog_bar=True)
-        self.log("val/tpr_at_5pct", tpr_at_5, prog_bar=True)
+        self.log("val/tpr_at_5pct_fpr", tpr_at_5_fpr, prog_bar=True)
+        self.log("val/tpr_top5pct", tpr_top5pct, prog_bar=True)
 
     def configure_optimizers(self):
         opt = torch.optim.Adam(self.parameters(), lr=self.hparams.lr, weight_decay=1e-4)
@@ -104,6 +107,28 @@ def _tpr_at_fpr(labels: np.ndarray, probs: np.ndarray, fpr_target: float) -> flo
     fpr, tpr, _ = roc_curve(labels, probs)
     mask = fpr <= fpr_target
     return float(tpr[mask].max()) if mask.any() else 0.0
+
+
+def _tpr_at_top_k(labels: np.ndarray, probs: np.ndarray, k_frac: float = 0.05) -> float:
+    """
+    PhysioNet Challenge 2025 metric: TPR among the top-k_frac patients ranked
+    by predicted probability (i.e. "sent for testing"), not TPR@k_frac-FPR.
+    """
+    n_pos = labels.sum()
+    if n_pos == 0:
+        return 0.0
+    k = int(np.ceil(k_frac * len(labels)))
+    top_idx = np.argsort(probs)[::-1][:k]
+    return float(labels[top_idx].sum()) / float(n_pos)
+
+
+def _git_sha() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=os.path.dirname(__file__)
+        ).decode().strip()
+    except Exception:
+        return "unknown"
 
 
 def _eval_test(module: ECGLightningModule, test_ds: Code15Dataset, batch_size: int, num_workers: int, accelerator: str) -> None:
@@ -131,9 +156,10 @@ def _eval_test(module: ECGLightningModule, test_ds: Code15Dataset, batch_size: i
     print(f"  samples:     {len(labels)}")
     print(f"  positives:   {int(labels.sum())} ({labels.mean()*100:.1f}%)")
     if labels.sum() > 0:
-        print(f"  AUROC:       {roc_auc_score(labels, probs):.4f}")
-        print(f"  AUPRC:       {average_precision_score(labels, probs):.4f}")
-        print(f"  TPR@5%FPR:   {_tpr_at_fpr(labels, probs, 0.05):.4f}")
+        print(f"  AUROC:              {roc_auc_score(labels, probs):.4f}")
+        print(f"  AUPRC:              {average_precision_score(labels, probs):.4f}")
+        print(f"  TPR@5%FPR:          {_tpr_at_fpr(labels, probs, 0.05):.4f}")
+        print(f"  TPR@top-5% (challenge score): {_tpr_at_top_k(labels, probs, 0.05):.4f}")
     else:
         print("  (no positives in test set — metrics not meaningful)")
     print("========================\n")
@@ -164,6 +190,9 @@ def main():
     parser.add_argument("--amp", action="store_true",
                         help="Enable 16-bit mixed precision (requires CUDA; ~40%% memory savings)")
     parser.add_argument("--wandb", action="store_true")
+    parser.add_argument("--run-name", default=None,
+                         help="Name for this run in W&B (and checkpoint dir). "
+                              "Useful for distinguishing parallel sweeps.")
     parser.add_argument("--fast", action="store_true",
                         help="200 train / 50 val samples (CPU smoke test)")
     parser.add_argument("--eval-test", action="store_true",
@@ -214,10 +243,27 @@ def main():
 
     module = ECGLightningModule(pos_weight=c15_train.pos_weight(), lr=args.lr)
 
+    run_config = {
+        "pos_weight": c15_train.pos_weight(),
+        "batch_size": args.batch_size,
+        "epochs": args.epochs,
+        "lr": args.lr,
+        "git_sha": _git_sha(),
+        "dataset_sizes": {
+            "code15_train": len(c15_train),
+            "code15_val": len(val_ds),
+            "samitrop_train": len(aux_train[0]) if args.samitrop and not args.fast else 0,
+            "ptbxl_train": (
+                len(aux_train[-1]) if args.ptbxl and not args.fast else 0
+            ),
+        },
+    }
+
     callbacks = [
         TQDMProgressBar(refresh_rate=1),
         ModelCheckpoint(
             monitor="val/auroc", mode="max", save_top_k=1,
+            dirpath=(f"lightning_logs/{args.run_name}/checkpoints" if args.run_name else None),
             filename="best-{epoch}-{val/auroc:.3f}",
         ),
         EarlyStopping(monitor="val/auroc", mode="max", patience=5),
@@ -226,7 +272,9 @@ def main():
     loggers = []
     if args.wandb:
         from pytorch_lightning.loggers import WandbLogger
-        loggers.append(WandbLogger(project="chagas-ecg", log_model=False))
+        loggers.append(WandbLogger(
+            project="chagas-ecg", name=args.run_name, log_model=True, config=run_config,
+        ))
 
     torch.set_float32_matmul_precision("high")
 

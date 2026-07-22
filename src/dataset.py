@@ -114,6 +114,14 @@ class Code15Dataset(Dataset):
                     self._id_to_pos[int(eid)] = (file_idx, row)
 
         labels = pd.read_csv(labels_csv)
+        labeled_ids = set(labels["exam_id"])
+        n_total = len(self._id_to_pos)
+        n_unlabeled = sum(1 for eid in self._id_to_pos if eid not in labeled_ids)
+        if n_unlabeled > 0:
+            print(
+                f"[Code15Dataset] {n_unlabeled}/{n_total} HDF5 records had no label row; "
+                f"excluded."
+            )
         labels = labels[labels["exam_id"].isin(self._id_to_pos)].reset_index(drop=True)
 
         all_splits = _patient_level_splits(labels)
