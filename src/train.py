@@ -97,9 +97,18 @@ class ECGLightningModule(pl.LightningModule):
         self.log("val/tpr_top5pct", tpr_top5pct, prog_bar=True)
 
     def configure_optimizers(self):
-        opt = torch.optim.Adam(self.parameters(), lr=self.hparams.lr, weight_decay=1e-4)
-        sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=self.trainer.max_epochs)
-        return [opt], [sched]
+        # AdamW decouples weight decay from the adaptive gradient update (Loshchilov & Hutter,
+        # 2019, "Decoupled Weight Decay Regularization") rather than Adam's L2-coupled version.
+        opt = torch.optim.AdamW(self.parameters(), lr=self.hparams.lr, weight_decay=1e-4)
+        # ReduceLROnPlateau (as used for this same CODE dataset lineage in Ribeiro et al. 2020,
+        # "Automatic diagnosis of the 12-lead ECG using a deep neural network", Nat Commun) only
+        # decays once validation actually plateaus, so it can't be truncated mid-cycle by early
+        # stopping the way a fixed-T_max CosineAnnealingLR can.
+        sched = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, mode="max", factor=0.1, patience=3)
+        return {
+            "optimizer": opt,
+            "lr_scheduler": {"scheduler": sched, "monitor": "val/auroc"},
+        }
 
 
 def _tpr_at_fpr(labels: np.ndarray, probs: np.ndarray, fpr_target: float) -> float:
@@ -266,7 +275,9 @@ def main():
             dirpath=(f"lightning_logs/{args.run_name}/checkpoints" if args.run_name else None),
             filename="best-{epoch}-{val/auroc:.3f}",
         ),
-        EarlyStopping(monitor="val/auroc", mode="max", patience=5),
+        # Patience must exceed the ReduceLROnPlateau scheduler's own patience (3) so a run
+        # isn't killed right as an LR drop is about to help.
+        EarlyStopping(monitor="val/auroc", mode="max", patience=8),
     ]
 
     loggers = []

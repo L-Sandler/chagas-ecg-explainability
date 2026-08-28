@@ -8,6 +8,39 @@ Items here are captured quickly during focused work. Triage regularly to keep th
 
 ---
 
+- [ ] **[P3][IMPROVEMENT]** Hyperparameter tuning for full-CODE-15% training
+  - _Added: 2026-08-28 | Context: the 2026-08-28 full-data run (all 18 CODE-15% parts +
+    SaMi-Trop + PTB-XL) used untuned defaults (lr=1e-3, batch=256, `CosineAnnealingLR`
+    with `T_max` pinned to the planned 10-epoch budget) and early-stopped at epoch 1
+    (`EarlyStopping(monitor="val/auroc", patience=5)`) — best AUROC 0.8296 / AUPRC 0.1403
+    on the CODE-15% test split. Epoch-1-best means the LR schedule never annealed past
+    ~60% of its cycle before patience ran out, so it's unclear whether this is a real
+    optimum or an artifact of the schedule/patience interaction._
+  - _Update 2026-08-28: code prerequisites landed in `src/train.py` — optimizer is now
+    AdamW (Loshchilov & Hutter 2019) instead of Adam+L2, scheduler is `ReduceLROnPlateau`
+    (matches Ribeiro et al. 2020's recipe on this same CODE dataset lineage) instead of a
+    fixed-`T_max` cosine schedule, and `EarlyStopping` patience is 8 (> the scheduler's
+    patience=3, so a run can't be killed right as an LR drop would help). Verified with a
+    local CPU `--fast` smoke run — no crash, scheduler steps correctly. **Still open:**
+    actually run the 3-point LR sweep ({3e-4, 1e-3, 3e-3}, log-spaced per Goodfellow et al.
+    *Deep Learning* §11.4.1) on a pod against the full dataset; pick the winner by
+    `val/tpr_top5pct` (challenge metric) with `val/auroc` as tie-break, then use that as the
+    baseline before/alongside transformer work._
+
+- [ ] **[BUG]** Patient-level split is not reproducible across different HDF5 subsets
+  - _Added: 2026-08-28 | Context: `_patient_level_splits()` in `src/dataset.py` calls
+    `sklearn.train_test_split(pids, random_state=42)` on whatever patient_id array is
+    passed in. Because the shuffle depends on the array's contents/order, a given
+    patient's train/val/test assignment can differ depending on which HDF5 parts are
+    loaded — e.g. reconstructing the split from `exams_part0.hdf5` alone does NOT
+    reproduce the same per-patient split as the full 18-part training run used. This
+    only matters for two runs of the same code with different data scope (not for a
+    single training run's own train/eval consistency, which is fine), but it means
+    `src/explain.py` can't reconstruct the exact held-out test set for a checkpoint
+    trained on more parts than are available locally. Fix: derive each patient's split
+    bucket from a hash of `(patient_id, seed)` compared against fixed thresholds, so
+    membership depends only on the patient, not on what else is in the array._
+
 - [x] **[P1][BUG]** Challenge metric is mislabeled/wrong — `_tpr_at_fpr` computes TPR@5%FPR, not TPR@top-5%-ranked
   - _Fixed: 2026-07-21 | Added `_tpr_at_top_k` in `src/train.py`, logged as `val/tpr_top5pct`; renamed the old metric to `val/tpr_at_5pct_fpr` everywhere it's logged/printed. Checkpoint monitor left on `val/auroc` per plan decision. Verified on `--fast` run: both metrics print, no crash._
 
