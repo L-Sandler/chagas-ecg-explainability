@@ -19,3 +19,7 @@ lightning_checkpoints/
 # quality_summary.csv is intentionally kept (small, human-readable).
 reports/*_scan*.csv
 reports/figures/
+
+# Versioned guardrail config (overrides the .claude/* ignore above)
+!.claude/settings.json
+!.claude/hooks/

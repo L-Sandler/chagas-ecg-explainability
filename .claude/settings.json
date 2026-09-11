@@ -1,0 +1,31 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\""
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "deny": [
+      "Write(.guardrails/**)",
+      "Edit(.guardrails/**)",
+      "Write(.claude/**)",
+      "Edit(.claude/**)",
+      "Write(spec/runs/**)",
+      "Edit(spec/runs/**)",
+      "Write(scripts/launch_run.py)",
+      "Edit(scripts/launch_run.py)",
+      "Write(spec/fable-experiment-facilitator-prompt.md)",
+      "Edit(spec/fable-experiment-facilitator-prompt.md)",
+      "Write(CLAUDE.md)",
+      "Edit(CLAUDE.md)"
+    ]
+  }
+}

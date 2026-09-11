@@ -1,0 +1,4 @@
+# approval + state files are session-local; never commit them
+*
+!.gitignore
+!README.md
