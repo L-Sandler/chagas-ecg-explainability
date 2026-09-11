@@ -4,15 +4,30 @@
       {
         "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\""
-          }
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\"" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\"" }
         ]
       }
     ]
   },
   "permissions": {
+    "allow": [
+      "Bash(runpodctl pod create *)",
+      "Bash(runpodctl pod delete *)",
+      "Bash(runpodctl remove pod *)",
+      "Bash(runpodctl pod get *)",
+      "Bash(runpodctl pod list*)",
+      "Bash(runpodctl gpu list*)",
+      "Bash(ssh root@*)",
+      "Bash(scp *)"
+    ],
     "deny": [
       "Write(.guardrails/**)",
       "Edit(.guardrails/**)",
@@ -22,6 +37,8 @@
       "Edit(spec/runs/**)",
       "Write(scripts/launch_run.py)",
       "Edit(scripts/launch_run.py)",
+      "Write(scripts/sweep_driver.sh)",
+      "Edit(scripts/sweep_driver.sh)",
       "Write(spec/fable-experiment-facilitator-prompt.md)",
       "Edit(spec/fable-experiment-facilitator-prompt.md)",
       "Write(CLAUDE.md)",

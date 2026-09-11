@@ -1,6 +1,6 @@
 {
   "sweep": "lr-sweep-adamw-plateau",
-  "owner_note": "User-owned. The facilitator agent launches ONLY runs listed here with status 'planned', via scripts/launch_run.py. Design decisions (which lr, epochs, etc.) live here and nowhere else.",
+  "owner_note": "User-owned. The facilitator agent launches ONLY runs listed here with status 'planned'. Approval is plan-level: `touch .guardrails/approve-lr-sweep` authorises exactly what this file describes. Design decisions (which lr, epochs, etc.) live here and nowhere else.",
   "code_sha": "44b1ca8",
   "code_paths_pinned": ["src/", "pyproject.toml", "uv.lock"],
   "budget": {
@@ -8,6 +8,7 @@
     "session_soft_cap_usd": 5.0,
     "max_pod_hours": 4,
     "max_concurrent_pods": 1,
+    "approval_ttl_hours": 8,
     "expected_cost_usd": "~1-2 total for both runs (L4 $0.49/hr ~45 min/run; RTX 4090 $0.74/hr ~25 min/run)"
   },
   "infra": {
@@ -19,7 +20,8 @@
     "gpu_preference_order": ["NVIDIA GeForce RTX 4090", "NVIDIA L4"],
     "gpu_id_note": "Verify exact --gpu-id strings against `runpodctl gpu list` at launch; 'NVIDIA L4' is confirmed from 2026-08-28.",
     "repo_on_pod": "/workspace/chagas-ecg-explainability",
-    "python": ".venv/bin/python"
+    "python": ".venv/bin/python",
+    "pass_api_key_at_create": "Pod self-termination needs RUNPOD_API_KEY in the pod env. scripts/create_pod.sh reads it from ~/.runpod/config.toml and passes it via --env so the key never appears in chat."
   },
   "common_args": [
     "--hdf5", "data/code15/exams_part*.hdf5",
@@ -42,27 +44,29 @@
       "args": ["--lr", "1e-3"],
       "note": "Completed 2026-08-28 on RTX 4090 pod 8w09mq198ctjw4. AUROC 0.8276, AUPRC 0.1366, TPR@5%FPR 0.4127, TPR@top-5% 0.3875."
     },
-    {
-      "name": "full-code15-lr3e-4",
-      "status": "planned",
-      "args": ["--lr", "3e-4"]
-    },
-    {
-      "name": "full-code15-lr3e-3",
-      "status": "planned",
-      "args": ["--lr", "3e-3"]
-    }
+    { "name": "full-code15-lr3e-4", "status": "planned", "args": ["--lr", "3e-4"] },
+    { "name": "full-code15-lr3e-3", "status": "planned", "args": ["--lr", "3e-3"] }
   ],
   "failure_policy": {
-    "crash_or_nan": "Report the log tail verbatim and halt. Do not retry, do not modify flags.",
+    "crash_or_nan": "Report the log tail verbatim and halt the sweep. No retry, no flag changes. sweep_driver.sh enforces this: a run that exits without a test-eval block stops the sweep.",
     "gpu_out_of_stock": "Fall through gpu_preference_order once. If none available, report and halt; do not pick a GPU outside the list.",
-    "ssh_drop_mid_run": "Reconnect and recover state from the run log; the process keeps running (detached launch).",
+    "ssh_drop_mid_run": "Reconnect and recover state from the run log; the driver and runs are detached and keep going.",
     "budget_exceeded": "Stop launching. Pull any finished outputs, delete the pod, report.",
+    "relaunch_after_failure": "Not the agent's call. The user removes .guardrails/state/launched-<run> to authorise a second attempt.",
     "anything_unlisted": "Halt and ask the user."
+  },
+  "termination": {
+    "mechanism": "scripts/sweep_driver.sh self-terminates the pod",
+    "triggers": [
+      "all planned runs finished AND ./outputs_pulled marker exists (agent pulled results)",
+      "all planned runs finished AND 45 min elapsed with no marker (agent session died)",
+      "pod alive longer than budget.max_pod_hours (hard stop, even mid-run)"
+    ],
+    "failure_mode": "If every termination method fails the driver writes ./TERMINATION_FAILED and logs it. Check `runpodctl pod list` and delete by hand."
   },
   "end_of_session": [
     "scp checkpoints + train_<run>.log + train_<run>.meta.json to local lightning_logs/<run>/",
     "fill notes/runs.md with the faithful-recording block for each run",
-    "runpodctl pod delete (requires approve-pod-delete), confirm `runpodctl pod list` is []"
+    "touch outputs_pulled on the pod, then confirm `runpodctl pod list` returns []"
   ]
 }
