@@ -21,11 +21,14 @@ Items here are captured quickly during focused work. Triage regularly to keep th
     (matches Ribeiro et al. 2020's recipe on this same CODE dataset lineage) instead of a
     fixed-`T_max` cosine schedule, and `EarlyStopping` patience is 8 (> the scheduler's
     patience=3, so a run can't be killed right as an LR drop would help). Verified with a
-    local CPU `--fast` smoke run — no crash, scheduler steps correctly. **Still open:**
-    actually run the 3-point LR sweep ({3e-4, 1e-3, 3e-3}, log-spaced per Goodfellow et al.
-    *Deep Learning* §11.4.1) on a pod against the full dataset; pick the winner by
-    `val/tpr_top5pct` (challenge metric) with `val/auroc` as tie-break, then use that as the
-    baseline before/alongside transformer work._
+    local CPU `--fast` smoke run — no crash, scheduler steps correctly._
+  - _Update 2026-08-28 (later same day): ran 1 of 3 planned LR points on an RTX 4090 —
+    lr=1e-3 stopped at epoch 9, AUROC 0.8276 / AUPRC 0.1366 / TPR@top-5% 0.3875 (challenge
+    metric improved over the original 0.3804; AUROC/AUPRC dipped slightly). Best checkpoint
+    still epoch 1 — looks like a real property of this data/model, not a schedule artifact.
+    User paused the sweep here to control cost; **lr=3e-4 and lr=3e-3 were not run.**
+    Checkpoint saved to `lightning_logs/full-code15-lr1e-3/`. Pod terminated. **Still open:**
+    the remaining two LR points, if/when this gets picked back up._
 
 - [ ] **[BUG]** Patient-level split is not reproducible across different HDF5 subsets
   - _Added: 2026-08-28 | Context: `_patient_level_splits()` in `src/dataset.py` calls
