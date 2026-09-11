@@ -180,12 +180,12 @@ def pre_bash(cmd):
         return
 
     # --- pod lifecycle ---
-    if re.search(r"\brunpodctl\s+pod\s+create\b", cmd):
+    if re.search(r"\brunpodctl\s+pod\s+create\b|\bcreate_pod\.sh\b", cmd):
         manifest, mp = load_manifest()
         if (STATE / "pod-created-at").exists():
             block("a pod is already recorded for this sweep (max_concurrent_pods=1). Delete it "
-                  "first, or if that record is stale ask the user to remove "
-                  ".guardrails/state/pod-created-at")
+                "first, or if that record is stale ask the user to remove "
+                ".guardrails/state/pod-created-at")
         check_budget(manifest, "create a pod")
         require_sweep(mp, "provision a pod")
         return

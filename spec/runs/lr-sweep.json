@@ -2,7 +2,11 @@
   "sweep": "lr-sweep-adamw-plateau",
   "owner_note": "User-owned. The facilitator agent launches ONLY runs listed here with status 'planned'. Approval is plan-level: `touch .guardrails/approve-lr-sweep` authorises exactly what this file describes. Design decisions (which lr, epochs, etc.) live here and nowhere else.",
   "code_sha": "44b1ca8",
-  "code_paths_pinned": ["src/", "pyproject.toml", "uv.lock"],
+  "code_paths_pinned": [
+    "src/",
+    "pyproject.toml",
+    "uv.lock"
+  ],
   "budget": {
     "wallet_hard_cap_usd": 15.0,
     "session_soft_cap_usd": 5.0,
@@ -17,22 +21,36 @@
     "volume_mount_path": "/workspace",
     "template_id": "runpod-torch-v240",
     "min_cuda_version": "12.4",
-    "gpu_preference_order": ["NVIDIA GeForce RTX 4090", "NVIDIA L4"],
-    "gpu_id_note": "Verify exact --gpu-id strings against `runpodctl gpu list` at launch; 'NVIDIA L4' is confirmed from 2026-08-28.",
+    "gpu_preference_order": [
+      "NVIDIA GeForce RTX 4090",
+      "NVIDIA L4",
+      "NVIDIA RTX A6000",
+      "NVIDIA RTX 2000 Ada Generation"
+    ],
+    "gpu_id_note": "Exact gpuId strings from `runpodctl gpu list` as of 2026-09-11. Blackwell PRO cards and MI300X excluded: cu124 pin (Blackwell needs cu128) and AMD respectively. Ordered by pipeline reliability, not price/stock — RTX 2000 Ada is last despite cheapest/best-stocked: 16GB and batch-256 memory fit unverified. L4 ranked behind 4090 despite both being proven: repeated create failures in EU-RO-1 regardless of listed stock.",
     "repo_on_pod": "/workspace/chagas-ecg-explainability",
     "python": ".venv/bin/python",
     "pass_api_key_at_create": "Pod self-termination needs RUNPOD_API_KEY in the pod env. scripts/create_pod.sh reads it from ~/.runpod/config.toml and passes it via --env so the key never appears in chat."
   },
   "common_args": [
-    "--hdf5", "data/code15/exams_part*.hdf5",
-    "--labels", "data/code15/code15_chagas_labels.csv",
-    "--samitrop", "data/samitrop/exams.hdf5",
-    "--ptbxl", "data/ptbxl",
-    "--epochs", "10",
-    "--batch-size", "256",
-    "--accelerator", "gpu",
-    "--devices", "1",
-    "--num-workers", "8",
+    "--hdf5",
+    "data/code15/exams_part*.hdf5",
+    "--labels",
+    "data/code15/code15_chagas_labels.csv",
+    "--samitrop",
+    "data/samitrop/exams.hdf5",
+    "--ptbxl",
+    "data/ptbxl",
+    "--epochs",
+    "10",
+    "--batch-size",
+    "256",
+    "--accelerator",
+    "gpu",
+    "--devices",
+    "1",
+    "--num-workers",
+    "8",
     "--amp",
     "--eval-test",
     "--wandb"
@@ -41,11 +59,28 @@
     {
       "name": "full-code15-lr1e-3",
       "status": "done",
-      "args": ["--lr", "1e-3"],
+      "args": [
+        "--lr",
+        "1e-3"
+      ],
       "note": "Completed 2026-08-28 on RTX 4090 pod 8w09mq198ctjw4. AUROC 0.8276, AUPRC 0.1366, TPR@5%FPR 0.4127, TPR@top-5% 0.3875."
     },
-    { "name": "full-code15-lr3e-4", "status": "planned", "args": ["--lr", "3e-4"] },
-    { "name": "full-code15-lr3e-3", "status": "planned", "args": ["--lr", "3e-3"] }
+    {
+      "name": "full-code15-lr3e-4",
+      "status": "planned",
+      "args": [
+        "--lr",
+        "3e-4"
+      ]
+    },
+    {
+      "name": "full-code15-lr3e-3",
+      "status": "planned",
+      "args": [
+        "--lr",
+        "3e-3"
+      ]
+    }
   ],
   "failure_policy": {
     "crash_or_nan": "Report the log tail verbatim and halt the sweep. No retry, no flag changes. sweep_driver.sh enforces this: a run that exits without a test-eval block stops the sweep.",
