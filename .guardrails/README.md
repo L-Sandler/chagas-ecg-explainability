@@ -42,8 +42,11 @@ RunPod billing page and adjust `spent_before_ledger_usd` if the drift matters.
 
 The agent can edit `src/preprocess.py`, `dataset.py`, `model.py`, `train.py` and `explain.py`
 only if a record in `notes/decisions/` has `status: approved` and lists that file on its
-`applies_to:` line. Copy `TEMPLATE.md`, write the decision and the reasoning yourself, set
-`status: approved`. Limits: this gates the Edit/Write tools and obvious shell writes
+`applies_to:` line. The agent may **draft** records (Write/Edit on `notes/decisions/` is allowed
+only while the record's status is `proposed`, before and after the change). It can never set
+`approved`, `superseded` or `rejected`, and can never touch a record that already has one of
+those. Approval is your one-line edit of the `status:` line; the reasoning in the record is
+yours to edit before you do. Limits: this gates the Edit/Write tools and obvious shell writes
 (`>`, `sed -i`, `tee`, `mv`, `cp`); it cannot see a script that rewrites a file from inside Python.
 
 ## Still one-shot (each file authorises one action, then is deleted)

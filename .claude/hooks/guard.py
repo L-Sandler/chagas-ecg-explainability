@@ -41,7 +41,7 @@ DEFAULT_TTL_HOURS = 8
 DEFAULT_ASSUMED_USD_PER_HR = 1.0  # used when a manifest lists no usable GPU prices
 
 PROTECTED_PATHS = (
-    ".guardrails/", ".claude/", "spec/runs/", "notes/decisions/",
+    ".guardrails/", ".claude/", "spec/runs/",  # notes/decisions/ has its own rule (propose-only)
     "scripts/launch_run.py", "scripts/sweep_driver.sh",
     "spec/fable-experiment-facilitator-prompt.md", "CLAUDE.md",
 )
@@ -299,8 +299,42 @@ def rel_of(p):
         return str(p)
 
 
-def pre_file(tool_input):
+def record_status(text):
+    head = re.match(r"---\s*\n(.*?)\n---", text or "", re.S)
+    m = head and re.search(r"^status:\s*(\w+)", head.group(1), re.M)
+    return m.group(1).lower() if m else None
+
+
+def check_decision_write(rel, tool, ti):
+    """The agent may DRAFT records (status: proposed) but never approve, supersede, reject or
+    rewrite one. Approval stays a one-line edit by the user."""
+    path = ROOT / rel
+    current = path.read_text() if path.exists() else None
+    if tool == "Write":
+        result = ti.get("content", "")
+    elif tool in ("Edit", "MultiEdit"):
+        if current is None:
+            block(f"cannot edit '{rel}': it does not exist.")
+        edits = ti.get("edits") if tool == "MultiEdit" else [ti]
+        result = current
+        for e in edits or []:
+            old, new = e.get("old_string", ""), e.get("new_string", "")
+            result = result.replace(old, new) if e.get("replace_all") else result.replace(old, new, 1)
+    else:
+        block(f"'{rel}' is user-owned; {tool} is not allowed on decision records.")
+    if current is not None and record_status(current) != "proposed":
+        block(f"'{rel}' has status '{record_status(current)}'. Only the user changes a record that "
+              f"is not 'proposed'; write a new record instead.")
+    if record_status(result) != "proposed":
+        block("agents may only write decision records with 'status: proposed'. The user flips a "
+              "record to 'approved'.")
+
+
+def pre_file(tool, tool_input):
     rel = rel_of(tool_input.get("file_path") or tool_input.get("notebook_path") or "")
+    if rel.startswith("notes/decisions/"):
+        check_decision_write(rel, tool, tool_input)
+        return
     for prot in PROTECTED_PATHS:
         if rel == prot.rstrip("/") or rel.startswith(prot):
             block(f"'{rel}' is user-owned guardrail/decision config; the agent does not edit it.")
@@ -501,7 +535,7 @@ def main():
         sys.exit(0)
 
     if tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
-        pre_file(ti)
+        pre_file(tool, ti)
     elif tool == "Bash":
         pre_bash(str(ti.get("command", "")))
     sys.exit(0)

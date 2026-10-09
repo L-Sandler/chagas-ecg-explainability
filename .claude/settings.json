@@ -48,9 +48,7 @@
       "Write(spec/fable-experiment-facilitator-prompt.md)",
       "Edit(spec/fable-experiment-facilitator-prompt.md)",
       "Write(CLAUDE.md)",
-      "Edit(CLAUDE.md)",
-      "Write(notes/decisions/**)",
-      "Edit(notes/decisions/**)"
+      "Edit(CLAUDE.md)"
     ]
   }
 }
