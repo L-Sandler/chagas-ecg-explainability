@@ -26,7 +26,8 @@ Optional:
     --samitrop     path to SaMi-Trop exams.hdf5 (adds 1,631 confirmed-positive records to training)
     --ptbxl        path to PTB-XL root dir (adds 21,799 Chagas-negative records; uses strat_fold split)
     --wandb        enable W&B logging
-    --eval-test    run held-out test set evaluation after training
+    --eval-val     after training, evaluate the best checkpoint on the val split
+                   (alias: --eval-test). The locked-final split is never evaluated here.
 """
 
 import argparse
@@ -140,8 +141,24 @@ def _git_sha() -> str:
         return "unknown"
 
 
+def _load_best_checkpoint(trainer: pl.Trainer, module: ECGLightningModule) -> ECGLightningModule:
+    """Evaluate the weights that won on validation, not whatever the last epoch left behind
+    (notes/decisions/0002). Prints which checkpoint was used."""
+    ckpt = trainer.checkpoint_callback
+    best = ckpt.best_model_path
+    if not best:
+        print("WARNING: no best checkpoint recorded; evaluating LAST-EPOCH weights.")
+        return module
+    epoch = torch.load(best, map_location="cpu", weights_only=False).get("epoch")
+    print(f"Evaluating BEST checkpoint: {best}")
+    print(f"  checkpoint epoch (0-based): {epoch}  |  monitored val/auroc: {float(ckpt.best_model_score):.4f}")
+    return ECGLightningModule.load_from_checkpoint(best, map_location="cpu")
+
+
 def _eval_test(module: ECGLightningModule, test_ds: Code15Dataset, batch_size: int, num_workers: int, accelerator: str) -> None:
-    """Run one pass over the held-out test set and print metrics."""
+    """Run one pass over the given dataset and print metrics. NOTE: despite the name this is
+    never the locked-final split (notes/decisions/0004); the header keeps the string
+    'TEST SET RESULTS' only because scripts/sweep_driver.sh greps for it."""
     loader = DataLoader(
         test_ds, batch_size=batch_size, shuffle=False,
         num_workers=num_workers,
@@ -161,7 +178,7 @@ def _eval_test(module: ECGLightningModule, test_ds: Code15Dataset, batch_size: i
     probs = torch.cat(all_preds).numpy()
     labels = torch.cat(all_labels).numpy()
 
-    print("\n=== TEST SET RESULTS ===")
+    print("\n=== TEST SET RESULTS (dev report on the evaluated split; locked-final is never read here) ===")
     print(f"  samples:     {len(labels)}")
     print(f"  positives:   {int(labels.sum())} ({labels.mean()*100:.1f}%)")
     if labels.sum() > 0:
@@ -204,8 +221,13 @@ def main():
                               "Useful for distinguishing parallel sweeps.")
     parser.add_argument("--fast", action="store_true",
                         help="200 train / 50 val samples (CPU smoke test)")
-    parser.add_argument("--eval-test", action="store_true",
-                        help="Run held-out test split after training and print metrics")
+    parser.add_argument("--exams-csv", default=None,
+                        help="CODE-15% exams.csv (age, sex) used as the split universe. "
+                             "Default: exams.csv next to --labels.")
+    parser.add_argument("--eval-val", "--eval-test", dest="eval_val", action="store_true",
+                        help="After training, evaluate the BEST checkpoint on the val split and "
+                             "print metrics. (--eval-test is a legacy alias kept for existing "
+                             "manifests.) The locked-final split is never evaluated by this script.")
     args = parser.parse_args()
 
     pl.seed_everything(42, workers=True)
@@ -218,8 +240,10 @@ def main():
     max_val = 50 if args.fast else None
 
     hdf5_paths = args.hdf5  # already a list due to nargs="+"
-    c15_train = Code15Dataset(hdf5_paths, args.labels, split="train", max_samples=max_train)
-    val_ds    = Code15Dataset(hdf5_paths, args.labels, split="val",   max_samples=max_val)
+    c15_train = Code15Dataset(hdf5_paths, args.labels, split="train", max_samples=max_train,
+                              exams_csv=args.exams_csv)
+    val_ds    = Code15Dataset(hdf5_paths, args.labels, split="val",   max_samples=max_val,
+                              exams_csv=args.exams_csv)
 
     # Auxiliary training sources — combined with CODE-15% train via ConcatDataset.
     # Val set is CODE-15% only (primary metric source); PTB-XL fold 10 is evaluated
@@ -258,6 +282,7 @@ def main():
         "epochs": args.epochs,
         "lr": args.lr,
         "git_sha": _git_sha(),
+        "split_scheme": "0004: patient-level 70/15/15 train/val/locked, stratified chagas x sex x age band",
         "dataset_sizes": {
             "code15_train": len(c15_train),
             "code15_val": len(val_ds),
@@ -304,10 +329,10 @@ def main():
 
     trainer.fit(module, train_loader, val_loader)
 
-    if args.eval_test:
-        print("\n--- CODE-15% test split ---")
-        c15_test = Code15Dataset(hdf5_paths, args.labels, split="test")
-        _eval_test(module, c15_test, args.batch_size, args.num_workers, args.accelerator)
+    if args.eval_val:
+        module = _load_best_checkpoint(trainer, module)
+        print("\n--- CODE-15% val split (the split used for checkpoint selection, so optimistic) ---")
+        _eval_test(module, val_ds, args.batch_size, args.num_workers, args.accelerator)
 
         if args.ptbxl:
             print("--- PTB-XL fold 10 (specificity check, all negative) ---")

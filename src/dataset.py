@@ -11,9 +11,11 @@ CODE-15% spans 18 part files (exams_part0.hdf5 … exams_part17.hdf5), each with
 ~20,000 records. Pass all available parts for full training; part0 alone is fine
 for local prototyping.
 
-Splitting strategy: patient-level stratified 70/15/15 (train/val/test).
-A fixed seed (42) is baked in so splits are reproducible across runs without
-a saved manifest. No patient appears in more than one split.
+Splitting strategy (notes/decisions/0004): patient-level 70/15/15 train / val / locked,
+stratified on chagas x sex x age band, over the full labelled universe (labels CSV joined to
+exams.csv). A fixed seed (42) makes it reproducible without a saved manifest, and it does not
+depend on which HDF5 parts are loaded. "locked" is the final held-out set: opening it needs
+unlock_final=True. No patient appears in more than one split.
 
 SaMi-Trop HDF5 layout (exams.hdf5):
     tracings: float64[1631, 4096, 12] — all records Chagas-positive (serologically
@@ -35,47 +37,94 @@ import numpy as np
 import h5py
 import torch
 from torch.utils.data import Dataset
-from sklearn.model_selection import train_test_split
 
 from preprocess import preprocess_ecg, preprocess_signal, CODE15_LEAD_ORDER, SAMITROP_LEAD_ORDER
 
 _SPLIT_SEED = 42
 
+# notes/decisions/0004: patient-level 70/15/15 train / val / locked-final.
+# "locked" is read once, at the very end; everything else (selection, tuning, explainability
+# exploration, the equity audit) uses "val".
+SPLIT_NAMES = ("train", "val", "locked")
+_SPLIT_FRACTIONS = (0.70, 0.15)  # train, val; locked is the remainder
 
-def _patient_level_splits(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    """
-    Stratified 70/15/15 split at the patient level.
+# 10-year age bands with the young end merged (0004/0005). np.digitize is left-closed:
+# 39 -> 0, 40 -> 1, ..., 80 -> 5.
+AGE_BAND_EDGES = (40, 50, 60, 70, 80)
+AGE_BAND_LABELS = ("<40", "40-49", "50-59", "60-69", "70-79", "80+")
 
-    Stratification is by whether a patient has any chagas-positive exam so
-    that the rare-positive class is proportionally represented in every split.
-    Returns {'train': df, 'val': df, 'test': df} with zero patient overlap.
+_SPLIT_TABLE_CACHE: dict[tuple[str, str], pd.DataFrame] = {}
+
+
+def age_band(age) -> np.ndarray:
+    """Band index (0..5) into AGE_BAND_LABELS."""
+    return np.digitize(age, AGE_BAND_EDGES)
+
+
+def _assign_patient_splits(patients: pd.DataFrame) -> pd.Series:
     """
+    patients: one row per patient with columns patient_id, chagas_any, is_male, band.
+    Returns Series patient_id -> split name.
+
+    Within every (chagas_any, sex, age band) stratum the patients are shuffled with a fixed
+    seed and cut 70/15/15, so every subgroup is proportionally represented in every split.
+    Deterministic given the SET of patients (strata are visited in sorted order and members
+    are sorted before shuffling), so row order and file order do not matter.
+    """
+    rng = np.random.RandomState(_SPLIT_SEED)
+    assignment: dict = {}
+    for _, grp in patients.groupby(["chagas_any", "is_male", "band"], sort=True):
+        pids = rng.permutation(np.sort(grp["patient_id"].values))
+        n = len(pids)
+        n_train = int(round(_SPLIT_FRACTIONS[0] * n))
+        n_val = int(round(_SPLIT_FRACTIONS[1] * n))
+        for pid in pids[:n_train]:
+            assignment[pid] = "train"
+        for pid in pids[n_train:n_train + n_val]:
+            assignment[pid] = "val"
+        for pid in pids[n_train + n_val:]:
+            assignment[pid] = "locked"
+    return pd.Series(assignment)
+
+
+def build_split_table(labels_csv: str, exams_csv: str) -> pd.DataFrame:
+    """
+    One row per labelled CODE-15% exam, with its patient-level split, computed over the FULL
+    labelled universe (labels CSV joined to exams.csv for age/sex). Membership therefore never
+    depends on which HDF5 parts happen to be loaded (closes the old part0-only split BUG).
+
+    Columns: exam_id, patient_id, chagas, age, is_male, band, split.
+    A patient's age is their minimum recorded age (proxy for first exam: exams.csv has no
+    date); sex is constant per patient in this data.
+    """
+    key = (os.path.abspath(labels_csv), os.path.abspath(exams_csv))
+    if key in _SPLIT_TABLE_CACHE:
+        return _SPLIT_TABLE_CACHE[key]
+    if not os.path.exists(exams_csv):
+        raise FileNotFoundError(
+            f"{exams_csv} not found. The patient split needs CODE-15% exams.csv (age, sex): "
+            f"it is the split universe. Pass exams_csv= or place it next to the labels CSV."
+        )
+
+    labels = pd.read_csv(labels_csv)
+    demo = pd.read_csv(exams_csv, usecols=["exam_id", "age", "is_male"])
+    df = labels.merge(demo, on="exam_id", how="left")
+    missing = int(df[["age", "is_male"]].isna().any(axis=1).sum())
+    if missing:
+        raise ValueError(f"{missing} labelled exams have no age/sex in {exams_csv}")
+
     patients = (
         df.groupby("patient_id")
-        .agg(chagas_any=("chagas", "any"))
+        .agg(chagas_any=("chagas", "any"), is_male=("is_male", "first"), age=("age", "min"))
         .reset_index()
     )
+    patients["band"] = age_band(patients["age"].values)
+    patient_split = _assign_patient_splits(patients)
 
-    def _split(pids: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        train, tmp = train_test_split(pids, test_size=0.30, random_state=_SPLIT_SEED)
-        val, test = train_test_split(tmp, test_size=0.50, random_state=_SPLIT_SEED)
-        return train, val, test
-
-    pos_p = patients[patients["chagas_any"]]["patient_id"].values
-    neg_p = patients[~patients["chagas_any"]]["patient_id"].values
-
-    pos_train, pos_val, pos_test = _split(pos_p)
-    neg_train, neg_val, neg_test = _split(neg_p)
-
-    splits = {
-        "train": set(pos_train) | set(neg_train),
-        "val":   set(pos_val)   | set(neg_val),
-        "test":  set(pos_test)  | set(neg_test),
-    }
-    return {
-        name: df[df["patient_id"].isin(pids)].reset_index(drop=True)
-        for name, pids in splits.items()
-    }
+    df["band"] = age_band(df["age"].values)
+    df["split"] = df["patient_id"].map(patient_split)
+    _SPLIT_TABLE_CACHE[key] = df
+    return df
 
 
 class Code15Dataset(Dataset):
@@ -85,10 +134,13 @@ class Code15Dataset(Dataset):
     hdf5_paths:  path or list of paths to exams_partN.hdf5 files.
                  Pass all 18 parts for full training; part0 alone for prototyping.
     labels_csv:  path to CSV with columns 'exam_id', 'patient_id', 'chagas'
-    split:       'train' | 'val' | 'test'
+    split:       'train' | 'val' | 'locked'
     max_samples: cap total samples (useful for CPU smoke tests)
+    exams_csv:   CODE-15% exams.csv (age, sex); default: exams.csv next to labels_csv
+    unlock_final: must be True to open the 'locked' split (see notes/decisions/0004)
 
-    Splitting is patient-level stratified 70/15/15 with seed 42.
+    Splitting is patient-level, stratified on chagas x sex x age band, 70/15/15 with seed 42,
+    computed over the full labelled universe (independent of which HDF5 parts are loaded).
     No patient appears in more than one split.
     """
 
@@ -98,9 +150,17 @@ class Code15Dataset(Dataset):
         labels_csv: str,
         split: str = "train",
         max_samples: int | None = None,
+        exams_csv: str | None = None,
+        unlock_final: bool = False,
     ):
-        if split not in ("train", "val", "test"):
-            raise ValueError(f"split must be 'train', 'val', or 'test'; got {split!r}")
+        if split not in SPLIT_NAMES:
+            raise ValueError(f"split must be one of {SPLIT_NAMES}; got {split!r}")
+        if split == "locked" and not unlock_final:
+            raise PermissionError(
+                "The 'locked' split is the final held-out set: read it once, at the very end. "
+                "Development, tuning and the equity audit use 'val'. Pass unlock_final=True "
+                "only for the final evaluation (notes/decisions/0004)."
+            )
 
         if isinstance(hdf5_paths, str):
             hdf5_paths = [hdf5_paths]
@@ -113,8 +173,10 @@ class Code15Dataset(Dataset):
                 for row, eid in enumerate(f["exam_id"][:]):
                     self._id_to_pos[int(eid)] = (file_idx, row)
 
-        labels = pd.read_csv(labels_csv)
-        labeled_ids = set(labels["exam_id"])
+        if exams_csv is None:
+            exams_csv = os.path.join(os.path.dirname(os.path.abspath(labels_csv)), "exams.csv")
+        table = build_split_table(labels_csv, exams_csv)
+        labeled_ids = set(table["exam_id"])
         n_total = len(self._id_to_pos)
         n_unlabeled = sum(1 for eid in self._id_to_pos if eid not in labeled_ids)
         if n_unlabeled > 0:
@@ -122,15 +184,14 @@ class Code15Dataset(Dataset):
                 f"[Code15Dataset] {n_unlabeled}/{n_total} HDF5 records had no label row; "
                 f"excluded."
             )
-        labels = labels[labels["exam_id"].isin(self._id_to_pos)].reset_index(drop=True)
-
-        all_splits = _patient_level_splits(labels)
-        df = all_splits[split]
+        table = table[table["exam_id"].isin(self._id_to_pos)]
+        df = table[table["split"] == split]
 
         if max_samples is not None:
             df = df.iloc[:max_samples]
 
         self.df = df.reset_index(drop=True)
+        self.split = split
         self._hdf5_handles: dict[int, h5py.File] = {}  # opened lazily per-worker
 
     def _get_hdf5(self, file_idx: int) -> h5py.File:

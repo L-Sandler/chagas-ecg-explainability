@@ -12,7 +12,7 @@ Usage:
     python src/explain.py --checkpoint <path> --record <exam_id> --method gradcam
 
     # Auto-pick the highest-confidence true-positive and false-positive in the
-    # test split and render both methods for each
+    # val split (default) and render both methods for each
     python src/explain.py --checkpoint <path> --method both
 """
 
@@ -28,7 +28,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from captum.attr import IntegratedGradients
 
-from dataset import Code15Dataset
+from dataset import Code15Dataset, SPLIT_NAMES, build_split_table
 from preprocess import LEAD_ORDER
 from train import ECGLightningModule
 
@@ -40,6 +40,19 @@ def load_module(checkpoint_path: str, device: str = "cpu") -> ECGLightningModule
     module.model.to(device)
     module.model.eval()
     return module
+
+
+def require_in_split(ds: Code15Dataset, exam_id: int, labels_csv: str, exams_csv: str | None) -> None:
+    """Refuse an exam that is not in the requested split, and say where it actually is
+    (the old part0-only split silently explained train/val exams as 'test')."""
+    if (ds.df["exam_id"] == exam_id).any():
+        return
+    if exams_csv is None:
+        exams_csv = os.path.join(os.path.dirname(os.path.abspath(labels_csv)), "exams.csv")
+    table = build_split_table(labels_csv, exams_csv)
+    hit = table.loc[table["exam_id"] == exam_id, "split"]
+    where = f"in split '{hit.iloc[0]}'" if len(hit) else "not in the labelled universe"
+    raise SystemExit(f"exam_id {exam_id} is not in split '{ds.split}' (it is {where}); refusing.")
 
 
 def get_record(ds: Code15Dataset, exam_id: int) -> tuple[torch.Tensor, float]:
@@ -96,8 +109,17 @@ class GradCAM1D:
         self.target_layer = target_layer if target_layer is not None else model.blocks[-1]
         self.activations: torch.Tensor | None = None
         self.gradients: torch.Tensor | None = None
-        self.target_layer.register_forward_hook(self._save_activation)
-        self.target_layer.register_full_backward_hook(self._save_gradient)
+        self._handles = [
+            self.target_layer.register_forward_hook(self._save_activation),
+            self.target_layer.register_full_backward_hook(self._save_gradient),
+        ]
+
+    def remove(self) -> None:
+        """Detach the hooks. Without this every GradCAM1D built on the same model stacks
+        another pair of hooks on the target layer."""
+        for h in self._handles:
+            h.remove()
+        self._handles = []
 
     def _save_activation(self, module, inputs, output):
         self.activations = output.detach()
@@ -168,7 +190,11 @@ def explain_record(
     x = signal.unsqueeze(0).to(device)
 
     if method in ("gradcam", "both"):
-        cam = GradCAM1D(module.model).attribute(x)
+        gradcam = GradCAM1D(module.model)
+        try:
+            cam = gradcam.attribute(x)
+        finally:
+            gradcam.remove()
         title = f"Grad-CAM | exam {exam_id} | label={label:.0f} pred={prob:.3f}"
         out_path = os.path.join(out_dir, f"{tag}_{exam_id}_gradcam.png")
         plot_explanation(signal.numpy(), cam, title, out_path)
@@ -185,9 +211,16 @@ def main():
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--hdf5", nargs="+", default=["data/code15/exams_part0.hdf5"])
     parser.add_argument("--labels", default="data/code15/code15_chagas_labels.csv")
-    parser.add_argument("--split", default="test", choices=["train", "val", "test"])
+    parser.add_argument("--exams-csv", default=None,
+                        help="CODE-15% exams.csv (split universe). Default: next to --labels.")
+    parser.add_argument("--split", default="val", choices=list(SPLIT_NAMES),
+                        help="Default 'val'. 'locked' is the final held-out set (needs "
+                             "--unlock-final); explainability exploration belongs on val.")
+    parser.add_argument("--unlock-final", action="store_true",
+                        help="Open the locked-final split. Final evaluation only.")
     parser.add_argument("--record", type=int, default=None,
-                         help="exam_id to explain. Omit to auto-pick the highest-confidence "
+                         help="exam_id to explain. It must belong to --split; the run is "
+                              "refused otherwise. Omit to auto-pick the highest-confidence "
                               "true-positive and false-positive in the split.")
     parser.add_argument("--method", default="both", choices=["gradcam", "ig", "both"])
     parser.add_argument("--out-dir", default=OUT_DIR)
@@ -195,9 +228,11 @@ def main():
     args = parser.parse_args()
 
     module = load_module(args.checkpoint, args.device)
-    ds = Code15Dataset(args.hdf5, args.labels, split=args.split)
+    ds = Code15Dataset(args.hdf5, args.labels, split=args.split,
+                       exams_csv=args.exams_csv, unlock_final=args.unlock_final)
 
     if args.record is not None:
+        require_in_split(ds, args.record, args.labels, args.exams_csv)
         explain_record(module, ds, args.record, args.method, "record", args.out_dir, args.device)
         return
 

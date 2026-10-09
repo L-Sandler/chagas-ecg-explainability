@@ -503,28 +503,30 @@ def check_pre_fix_vs_post_fix() -> list[Check]:
 
 def check_split_leakage() -> list[Check]:
     """
-    Verify that the patient-level 70/15/15 splits have zero patient overlap.
-    Instantiates all three splits in-memory; does NOT open HDF5 (label CSV only).
+    Verify that the patient-level 70/15/15 train/val/locked splits (notes/decisions/0004) have
+    zero patient overlap. Reads the split table only (labels CSV + exams.csv): no HDF5 and no
+    Code15Dataset, so the locked-final split is never opened.
     """
-    hdf5 = "data/code15/exams_part0.hdf5"
     labels_csv = "data/code15/code15_chagas_labels.csv"
-    if not (os.path.exists(hdf5) and os.path.exists(labels_csv)):
-        return [Check("split leakage", "SKIP", f"missing {hdf5} or {labels_csv}")]
+    exams_csv = "data/code15/exams.csv"
+    if not (os.path.exists(exams_csv) and os.path.exists(labels_csv)):
+        return [Check("split leakage", "SKIP", f"missing {exams_csv} or {labels_csv}")]
 
     import sys
     sys.path.insert(0, os.path.dirname(__file__))
-    from dataset import Code15Dataset
+    from dataset import build_split_table
 
+    table = build_split_table(labels_csv, exams_csv)
     out = []
     splits: dict[str, set] = {}
     counts: dict[str, dict] = {}
-    for name in ("train", "val", "test"):
-        ds = Code15Dataset(hdf5, labels_csv, split=name)
-        splits[name] = set(ds.df["patient_id"])
+    for name in ("train", "val", "locked"):
+        sub = table[table["split"] == name]
+        splits[name] = set(sub["patient_id"])
         counts[name] = {
-            "exams": len(ds.df),
-            "pos": int(ds.df["chagas"].sum()),
-            "pct": ds.df["chagas"].mean() * 100,
+            "exams": len(sub),
+            "pos": int(sub["chagas"].sum()),
+            "pct": sub["chagas"].mean() * 100,
         }
         out.append(Check(
             f"split {name}: size and prevalence",
@@ -533,7 +535,7 @@ def check_split_leakage() -> list[Check]:
             f"{counts[name]['pos']} pos ({counts[name]['pct']:.1f}%)",
         ))
 
-    for a, b in [("train", "val"), ("train", "test"), ("val", "test")]:
+    for a, b in [("train", "val"), ("train", "locked"), ("val", "locked")]:
         overlap = splits[a] & splits[b]
         out.append(Check(
             f"split leakage: {a} ∩ {b} patients",

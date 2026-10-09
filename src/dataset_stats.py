@@ -17,27 +17,15 @@ sys.path.insert(0, os.path.dirname(__file__))
 import h5py
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-
-_SPLIT_SEED = 42
+from dataset import build_split_table, SPLIT_NAMES
 
 
 def _patient_splits(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    """Mirrors dataset.py _patient_level_splits exactly."""
-    patients = df.groupby("patient_id").agg(chagas_any=("chagas", "any")).reset_index()
-
-    def _split(pids):
-        tr, tmp = train_test_split(pids, test_size=0.30, random_state=_SPLIT_SEED)
-        v, te = train_test_split(tmp, test_size=0.50, random_state=_SPLIT_SEED)
-        return tr, v, te
-
-    pos_tr, pos_v, pos_te = _split(patients[patients["chagas_any"]]["patient_id"].values)
-    neg_tr, neg_v, neg_te = _split(patients[~patients["chagas_any"]]["patient_id"].values)
-    return {
-        "train": df[df["patient_id"].isin(set(pos_tr) | set(neg_tr))],
-        "val":   df[df["patient_id"].isin(set(pos_v)  | set(neg_v))],
-        "test":  df[df["patient_id"].isin(set(pos_te) | set(neg_te))],
-    }
+    """Splits of `df` (already restricted to locally present exams) according to the
+    notes/decisions/0004 split table: counts only, no signals are read."""
+    table = build_split_table("data/code15/code15_chagas_labels.csv", "data/code15/exams.csv")
+    keep = table[table["exam_id"].isin(set(df["exam_id"]))]
+    return {name: keep[keep["split"] == name] for name in SPLIT_NAMES}
 
 
 def stats_code15() -> None:
@@ -95,7 +83,7 @@ def stats_code15() -> None:
     print(f"  Patients with >1 exam:   {(exams_per_pt > 1).sum():,}")
 
     splits = _patient_splits(matched)
-    print(f"\n  Patient-level 70/15/15 splits (seed={_SPLIT_SEED}):")
+    print("\n  Patient-level 70/15/15 splits (0004: train/val/locked, stratified chagas x sex x age):")
     print(f"  {'split':6}  {'exams':>6}  {'patients':>8}  {'positive':>8}  {'prevalence':>10}")
     for name, df in splits.items():
         print(f"  {name:6}  {len(df):6}  {df['patient_id'].nunique():8}  "
@@ -103,7 +91,7 @@ def stats_code15() -> None:
 
     # Leakage check
     ps = {name: set(df["patient_id"]) for name, df in splits.items()}
-    leaks = [(a, b, ps[a] & ps[b]) for a, b in [("train","val"),("train","test"),("val","test")]]
+    leaks = [(a, b, ps[a] & ps[b]) for a, b in [("train","val"),("train","locked"),("val","locked")]]
     any_leak = any(len(overlap) > 0 for _, _, overlap in leaks)
     print(f"\n  Patient leakage check: {'FAIL' if any_leak else 'PASS — zero overlap across all splits'}")
     if any_leak:

@@ -14,12 +14,13 @@ SAMITROP_LEAD_ORDER = ["I", "II", "III", "AVR", "AVL", "AVF", "V1", "V2", "V3", 
 
 
 def _strip_zero_padding(signal: np.ndarray) -> np.ndarray:
-    """Remove trailing zero rows (7s recordings zero-padded to 4096 in HDF5)."""
-    nonzero_rows = np.any(signal != 0, axis=1)
-    if not nonzero_rows.any():
+    """Remove all-zero rows at BOTH ends (7s recordings are zero-padded to 4096 in HDF5,
+    split between the start and the end). Mirrors the challenge converter
+    (python-example-2025/prepare_code15_data.py). See notes/decisions/0001."""
+    nonzero_rows = np.flatnonzero(np.any(signal != 0, axis=1))
+    if nonzero_rows.size == 0:
         return signal
-    last = int(np.where(nonzero_rows)[0][-1]) + 1
-    return signal[:last]
+    return signal[nonzero_rows[0]: nonzero_rows[-1] + 1]
 
 
 def _bandpass(signal: np.ndarray, fs: float) -> np.ndarray:
