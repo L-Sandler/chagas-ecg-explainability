@@ -1,6 +1,6 @@
 {
   "sweep": "lr-sweep-adamw-plateau",
-  "owner_note": "User-owned. The facilitator agent launches ONLY runs listed here with status 'planned'. Approval is plan-level: `touch .guardrails/approve-lr-sweep` authorises exactly what this file describes. Design decisions (which lr, epochs, etc.) live here and nowhere else.",
+  "owner_note": "RETIRED 2026-10-09. Kept as a record of the Aug 28 run. User-owned. The facilitator agent launches ONLY runs listed here with status 'planned'. Approval is plan-level: `touch .guardrails/approve-lr-sweep` authorises exactly what this file describes. Design decisions (which lr, epochs, etc.) live here and nowhere else.",
   "code_sha": "44b1ca8",
   "code_paths_pinned": [
     "src/",
@@ -27,7 +27,7 @@
       "NVIDIA RTX A6000",
       "NVIDIA RTX 2000 Ada Generation"
     ],
-    "gpu_id_note": "Exact gpuId strings from `runpodctl gpu list` as of 2026-09-11. Blackwell PRO cards and MI300X excluded: cu124 pin (Blackwell needs cu128) and AMD respectively. Ordered by pipeline reliability, not price/stock — RTX 2000 Ada is last despite cheapest/best-stocked: 16GB and batch-256 memory fit unverified. L4 ranked behind 4090 despite both being proven: repeated create failures in EU-RO-1 regardless of listed stock.",
+    "gpu_id_note": "Exact gpuId strings from `runpodctl gpu list` as of 2026-09-11. Blackwell PRO cards and MI300X excluded: cu124 pin (Blackwell needs cu128) and AMD respectively. Ordered by pipeline reliability, not price/stock \u2014 RTX 2000 Ada is last despite cheapest/best-stocked: 16GB and batch-256 memory fit unverified. L4 ranked behind 4090 despite both being proven: repeated create failures in EU-RO-1 regardless of listed stock.",
     "repo_on_pod": "/workspace/chagas-ecg-explainability",
     "python": ".venv/bin/python",
     "pass_api_key_at_create": "Pod self-termination needs RUNPOD_API_KEY in the pod env. scripts/create_pod.sh reads it from ~/.runpod/config.toml and passes it via --env so the key never appears in chat."
@@ -67,19 +67,21 @@
     },
     {
       "name": "full-code15-lr3e-4",
-      "status": "planned",
+      "status": "cancelled",
       "args": [
         "--lr",
         "3e-4"
-      ]
+      ],
+      "note": "Cancelled 2026-10-09: built on pre-fix preprocessing (leading zero-padding not stripped) and last-epoch test evaluation. Budget is being re-planned across several manifests."
     },
     {
       "name": "full-code15-lr3e-3",
-      "status": "planned",
+      "status": "cancelled",
       "args": [
         "--lr",
         "3e-3"
-      ]
+      ],
+      "note": "Cancelled 2026-10-09: built on pre-fix preprocessing (leading zero-padding not stripped) and last-epoch test evaluation. Budget is being re-planned across several manifests."
     }
   ],
   "failure_policy": {

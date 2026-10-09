@@ -4,7 +4,10 @@
       {
         "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
-          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\"" }
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\""
+          }
         ]
       }
     ],
@@ -12,7 +15,10 @@
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\"" }
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\""
+          }
         ]
       }
     ]
@@ -42,7 +48,9 @@
       "Write(spec/fable-experiment-facilitator-prompt.md)",
       "Edit(spec/fable-experiment-facilitator-prompt.md)",
       "Write(CLAUDE.md)",
-      "Edit(CLAUDE.md)"
+      "Edit(CLAUDE.md)",
+      "Write(notes/decisions/**)",
+      "Edit(notes/decisions/**)"
     ]
   }
 }

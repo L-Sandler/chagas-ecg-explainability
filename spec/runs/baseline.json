@@ -1,0 +1,85 @@
+{
+  "sweep": "baseline-TODO",
+  "owner_note": "User-owned. Infra copied from lr-sweep.json as a starting point. common_args, runs, cap_usd and code_sha are YOUR design decisions; this template has no planned runs and a code_sha that fails the launcher's pin check until you set it.",
+  "code_sha": "TODO_SET_AFTER_FIXES_ARE_COMMITTED",
+  "code_paths_pinned": [
+    "src/",
+    "pyproject.toml",
+    "uv.lock"
+  ],
+  "budget": {
+    "cap_usd": 0,
+    "max_pod_hours": 2,
+    "max_concurrent_pods": 1,
+    "approval_ttl_hours": 8,
+    "gpu_price_usd_per_hr": {
+      "NVIDIA GeForce RTX 4090": 0.74,
+      "NVIDIA L4": 0.49
+    },
+    "assumed_usd_per_hr_unlisted": 1.0,
+    "note": "cap_usd=0 means no manifest-level dollar cap (the global cap in .guardrails/budget.json still applies). Prices are the Sep-11 manifest figures; the hook uses the highest listed price (or the unlisted default), so estimates err high."
+  },
+  "infra": {
+    "datacenter": "EU-RO-1",
+    "network_volume_id": "w6ahd2sms6",
+    "volume_mount_path": "/workspace",
+    "template_id": "runpod-torch-v240",
+    "min_cuda_version": "12.4",
+    "gpu_preference_order": [
+      "NVIDIA GeForce RTX 4090",
+      "NVIDIA L4",
+      "NVIDIA RTX A6000",
+      "NVIDIA RTX 2000 Ada Generation"
+    ],
+    "gpu_id_note": "Exact gpuId strings from `runpodctl gpu list` as of 2026-09-11. Blackwell PRO cards and MI300X excluded: cu124 pin (Blackwell needs cu128) and AMD respectively. Ordered by pipeline reliability, not price/stock \u2014 RTX 2000 Ada is last despite cheapest/best-stocked: 16GB and batch-256 memory fit unverified. L4 ranked behind 4090 despite both being proven: repeated create failures in EU-RO-1 regardless of listed stock.",
+    "repo_on_pod": "/workspace/chagas-ecg-explainability",
+    "python": ".venv/bin/python",
+    "pass_api_key_at_create": "Pod self-termination needs RUNPOD_API_KEY in the pod env. scripts/create_pod.sh reads it from ~/.runpod/config.toml and passes it via --env so the key never appears in chat."
+  },
+  "common_args": [
+    "--hdf5",
+    "data/code15/exams_part*.hdf5",
+    "--labels",
+    "data/code15/code15_chagas_labels.csv",
+    "--samitrop",
+    "data/samitrop/exams.hdf5",
+    "--ptbxl",
+    "data/ptbxl",
+    "--epochs",
+    "10",
+    "--batch-size",
+    "256",
+    "--accelerator",
+    "gpu",
+    "--devices",
+    "1",
+    "--num-workers",
+    "8",
+    "--amp",
+    "--eval-test",
+    "--wandb"
+  ],
+  "runs": [],
+  "failure_policy": {
+    "crash_or_nan": "Report the log tail verbatim and halt the sweep. No retry, no flag changes. sweep_driver.sh enforces this: a run that exits without a test-eval block stops the sweep.",
+    "gpu_out_of_stock": "Fall through gpu_preference_order once. If none available, report and halt; do not pick a GPU outside the list.",
+    "ssh_drop_mid_run": "Reconnect and recover state from the run log; the driver and runs are detached and keep going.",
+    "budget_exceeded": "Stop launching. Pull any finished outputs, delete the pod, report.",
+    "relaunch_after_failure": "Not the agent's call. The user removes .guardrails/state/launched-<run> to authorise a second attempt.",
+    "anything_unlisted": "Halt and ask the user."
+  },
+  "termination": {
+    "mechanism": "scripts/sweep_driver.sh self-terminates the pod",
+    "triggers": [
+      "all planned runs finished AND ./outputs_pulled marker exists (agent pulled results)",
+      "all planned runs finished AND 45 min elapsed with no marker (agent session died)",
+      "pod alive longer than budget.max_pod_hours (hard stop, even mid-run)"
+    ],
+    "failure_mode": "If every termination method fails the driver writes ./TERMINATION_FAILED and logs it. Check `runpodctl pod list` and delete by hand."
+  },
+  "end_of_session": [
+    "scp checkpoints + train_<run>.log + train_<run>.meta.json to local lightning_logs/<run>/",
+    "fill notes/runs.md with the faithful-recording block for each run",
+    "touch outputs_pulled on the pod, then confirm `runpodctl pod list` returns []"
+  ]
+}
