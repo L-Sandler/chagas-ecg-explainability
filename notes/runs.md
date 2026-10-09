@@ -14,6 +14,18 @@ The two 2026-08-28 rows are back-filled from `lightning_logs/*/train.log` and se
 Those logs do not contain the launch command, so their command is reconstructed, not recorded.
 (The full-code15-10ep row used the pre-`44b1ca8` Adam + CosineAnnealing code, patience 5.)
 
+**Provenance caveats added 2026-10-09 (facts from code and logs, no interpretation):**
+- The `test *` and `TPR` columns of both rows were computed on the weights left after the LAST
+  epoch (0-based epoch 6 for `full-code15-10ep`, epoch 9 for `full-code15-lr1e-3`), not on the
+  best checkpoint (epoch 1 in both). `src/train.py` evaluated `module` right after `trainer.fit()`.
+  Fixed in this repo (decision 0002); these rows were not recomputed.
+- Both runs used the preprocessing before decision 0001 (leading zero-padding of short
+  recordings was not stripped).
+- Both runs used the old split (test = 51,529 exams, 991 positives). That split is superseded
+  by decision 0004 (train/val/locked-final, stratified on chagas x sex x age band). Results on
+  it are not comparable with results on the new split.
+- `full-code15-lr3e-4` and `full-code15-lr3e-3` were cancelled (2026-10-09) and never ran.
+
 ---
 
 ## Template: copy per run

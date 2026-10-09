@@ -30,7 +30,25 @@ Items here are captured quickly during focused work. Triage regularly to keep th
     Checkpoint saved to `lightning_logs/full-code15-lr1e-3/`. Pod terminated. **Still open:**
     the remaining two LR points, if/when this gets picked back up._
 
-- [ ] **[BUG]** Patient-level split is not reproducible across different HDF5 subsets
+## 2026-10-09 audit: fixed
+- [x] **[BUG]** Leading zero-padding of short recordings never stripped (`preprocess.py`, decision 0001). Every earlier checkpoint was trained on it.
+- [x] **[BUG]** Test metrics came from last-epoch weights, not the best checkpoint (`train.py`, decision 0002). `train.py` now evaluates the best checkpoint on val and never touches the locked-final split.
+- [x] **[BUG]** `explain.py` rebuilt the split from part0 only, so "test" figures were drawn from train/val exams; replaced by the part-independent split of decision 0004 (supersedes the open split BUG below). `explain.py` now defaults to val, refuses exams outside the requested split, and refuses the locked split without an explicit unlock.
+- [x] **[BUG]** `GradCAM1D` hooks were never removed (stacked on repeated use).
+- [x] **[FEATURE]** Sex/age-band subgroup report with patient-level bootstrap CIs (`src/equity.py`, decision 0005). Verified on synthetic scores only; not yet run on a trained model.
+
+## 2026-10-09 audit: open (decisions for the user, not tasks)
+- [ ] **[DECISION]** Recording length tracks the label: in part0, 93.3% of positive vs 60.0% of negative CODE-15% exams are short (7 s) recordings; SaMi-Trop (all positive) is 46.9% short, PTB-XL (all negative) 0%. Stripping both pad ends (0001) does not remove the cue, because the trailing pad remains. How to handle length is undecided.
+- [ ] **[DECISION]** SaMi-Trop (all positive) and PTB-XL (all negative) make the label perfectly predictable from source inside the training set. Baseline keeps both as train-only (0004); a with/without ablation is deferred.
+- [ ] **[DECISION]** Two exams from the 2026-08-28 explainability figures (2905181, 784010) fall in the new locked-final split and their figures have been seen. Options: exclude those patients from the final evaluation, or disclose.
+- [ ] **[DECISION]** Explainability method choices: example selection (`pick_interesting_records` scans only the first 1,000 records), IG visualisation (per-lead min-max on signed values loses sign and cross-lead comparability), IG zero baseline cannot see padding, Grad-CAM is shared across all 12 leads.
+- [ ] **[DECISION]** `pos_weight` is computed from CODE-15% train only and ignores the added SaMi-Trop positives and PTB-XL negatives.
+- [ ] **[INFRA]** The new split needs CODE-15% `exams.csv` (age, sex) next to the labels file; `scripts/download_data.sh` does not fetch it. Confirm it is on the RunPod volume before a run.
+- [ ] **[INFRA]** `scripts/sweep_driver.sh` marks a run done by grepping for `TEST SET RESULTS`; `train.py` keeps that string in its header for now even though the report is on val. Update the driver's marker when convenient.
+- [ ] **[DATA]** 372 of 233,513 patient_ids have an age spread of 10+ years across their exams (max 82), so some ids probably mix different people. Split age uses each patient's minimum recorded age.
+- [ ] **[CLEANUP]** `reports/explainability/*.png` (2026-08-28) are not held-out and predate the fixes; regenerate or remove.
+
+- [x] ~~**[BUG]** Patient-level split is not reproducible across different HDF5 subsets~~ (superseded: fixed by decision 0004, 2026-10-09)
   - _Added: 2026-08-28 | Context: `_patient_level_splits()` in `src/dataset.py` calls
     `sklearn.train_test_split(pids, random_state=42)` on whatever patient_id array is
     passed in. Because the shuffle depends on the array's contents/order, a given
