@@ -31,7 +31,7 @@ actions behind `.guardrails/approve-*` files that only the user creates.
 
 ## Working agreement (research authorship)
 
-- **Paper prose is written by the user.** Claude coaches only: questions, feedback on the user's drafts, tracing every number to a log line. Claude never drafts paper text. Claude may draft README prose for the user to review.
+- **Paper prose is written by the user.** Claude coaches only: questions, feedback on the user's drafts, tracing every number to a log line. Claude never drafts paper text. The root `README.md` is edited only with the user's explicit permission; Claude may propose README text in chat but never writes it into the file.
 - **Design decisions are the user's.** Ask before any choice that affects research design: data, preprocessing, splits, model, training config, metrics, explainability method, example/figure selection, budget allocation. A bug fix that changes model inputs or reported numbers counts as design-affecting: surface it, do not apply it silently.
 - `.claude/hooks/guard.py` enforces part of this: `src/preprocess.py`, `dataset.py`, `model.py`, `train.py`, `explain.py` can be edited only against an approved record in `notes/decisions/` (see `.guardrails/README.md`).
 - Existing AI-generated text (`spec/spec.md`, `spec/next-session-plan.md`, backlog entries, the old README) is not source material for the paper.

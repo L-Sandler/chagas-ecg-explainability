@@ -53,6 +53,7 @@ yours to edit before you do. Limits: this gates the Edit/Write tools and obvious
 
 | File to `touch`        | Authorises                                    |
 |------------------------|-----------------------------------------------|
+| `unlock-final-test`    | one command that opens the locked-final split (`--unlock-final` / `unlock_final=True`), or writing a `.py`/`.sh`/`.ipynb` that does. Consumed when the command succeeds: the locked set is read once, at the very end (notes/decisions/0004). |
 | `approve-pod-install`  | one install/download command on the pod       |
 | `approve-kill`         | one `kill`/`pkill`                            |
 | `approve-scp`          | one `scp` outside `lightning_logs/`           |
@@ -68,7 +69,9 @@ Any other direct `train.py` launch is refused; use `scripts/launch_run.py` or
 
 Recursive deletes; any delete touching `/workspace`, `data/`, `lightning_logs/` or a
 checkpoint; force-push; branch delete; `git reset --hard`; `git clean`; pod stop/reset/restart;
-network-volume delete; and any write to the guardrail files or decision records themselves.
+network-volume delete; and any write to the guardrail files themselves. The root `README.md` is
+user-only too: the agent may propose README text in chat, never write it into the file. (Decision
+records are the one exception: the agent may draft them as `status: proposed`, see above.)
 
 ## State (written by the hook, after commands actually succeed)
 

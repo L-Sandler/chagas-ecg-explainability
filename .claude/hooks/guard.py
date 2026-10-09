@@ -44,6 +44,7 @@ PROTECTED_PATHS = (
     ".guardrails/", ".claude/", "spec/runs/",  # notes/decisions/ has its own rule (propose-only)
     "scripts/launch_run.py", "scripts/sweep_driver.sh",
     "spec/fable-experiment-facilitator-prompt.md", "CLAUDE.md",
+    "README.md",  # root README only (rel == "README.md"): edited only with the user's permission
 )
 
 # Research-relevant code. Editing these is a design-affecting act (G4).
@@ -66,11 +67,17 @@ ALWAYS_BLOCK = [
 # Writes that would modify guardrail config through the shell.
 WRITE_TOKENS = r"(\bsed\s+-i|\btee\b|\bmv\b|\bcp\b|\btouch\b|\btruncate\b|\bdd\b)"
 SHELL_PROTECTED = (r"\.guardrails", r"\.claude/", r"spec/runs", r"notes/decisions", r"launch_run\.py",
-                   r"sweep_driver\.sh", r"fable-experiment-facilitator-prompt", r"\bCLAUDE\.md")
+                   r"sweep_driver\.sh", r"fable-experiment-facilitator-prompt", r"\bCLAUDE\.md",
+                   r"(?<![\w/.-])README\.md")  # root README only; sub-dir READMEs unaffected
 # Redirections that are not file writes (2>&1, >/dev/null) must not trip the write check.
 NOISE_REDIRECTS = r"(\d*>&\d+|\d*>>?\s*/dev/null)"
 
+UNLOCK_PATTERN = r"--unlock-final\b|\bunlock_final\s*=\s*True"
+
 ONE_SHOT = [  # (pattern, approval file, description, pod_only)
+    # notes/decisions/0004: the locked-final split is read ONCE, at the very end. The user
+    # creates this file for exactly that evaluation; it is consumed when the command succeeds.
+    (UNLOCK_PATTERN, "unlock-final-test", "open the locked-final split (final evaluation only)", False),
     (r"\b(kill|pkill|killall)\b", "approve-kill", "kill a process", False),
     (r"\b(uv\s+pip|uv\s+sync|pip\s+install|apt(-get)?\s+install|\bwget\s|\bcurl\s+-[^|]*-O)",
      "approve-pod-install", "install or download on the pod", True),
@@ -339,6 +346,15 @@ def pre_file(tool, tool_input):
         if rel == prot.rstrip("/") or rel.startswith(prot):
             block(f"'{rel}' is user-owned guardrail/decision config; the agent does not edit it.")
     require_decision(rel)
+    # A script that opens the locked split would dodge the command-line check, so inspect
+    # the content being written too. The gated source files (which define the flag) are
+    # already covered by the decision gate above.
+    if rel not in GATED_PATHS and rel.endswith((".py", ".sh", ".ipynb")):
+        text = " ".join(str(v) for k, v in tool_input.items()
+                        if k in ("content", "new_string")) + " ".join(
+            str(e.get("new_string", "")) for e in tool_input.get("edits", []) or [])
+        if re.search(UNLOCK_PATTERN, text):
+            one_shot("unlock-final-test", f"write code that opens the locked-final split ({rel})")
 
 
 def pre_bash(cmd):
