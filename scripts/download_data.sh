@@ -21,6 +21,12 @@ if [ ! -f code15_chagas_labels.csv ]; then
 else
     echo "  code15_chagas_labels.csv already present, skipping"
 fi
+# exams.csv (age, sex, patient_id) is the patient-split universe (notes/decisions/0004); training refuses to start without it.
+if [ ! -f exams.csv ]; then
+    curl -L "https://zenodo.org/records/4916206/files/exams.csv?download=1" -o exams.csv
+else
+    echo "  exams.csv already present, skipping"
+fi
 cd ../..
 
 echo "=== SaMi-Trop ==="
