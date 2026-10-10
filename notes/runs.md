@@ -38,7 +38,7 @@ Those logs do not contain the launch command, so their command is reconstructed,
 - **git HEAD:** `<sha>`  | manifest `code_sha`: `<sha>` | code-pin check: pass/fail
 - **Pod:** `<pod-id>`, `<GPU>`, driver CUDA `<x.y>`, `$<rate>/hr`
 - **W&B run:** `<url>`
-- **Config as logged to W&B:** pos_weight=, batch_size=, epochs=, lr=, git_sha=, per-source sizes=
+- **Config as logged to W&B:** pos_weight=, pos_weight_code15_only=, input_len=, batch_size=, epochs=, lr=, git_sha=, per-source sizes=
 - **Per-epoch metrics:**
 
   | epoch | val/auroc | val/tpr_top5pct | val/tpr_at_5pct_fpr | train loss |
@@ -46,8 +46,9 @@ Those logs do not contain the launch command, so their command is reconstructed,
 
 - **Stop reason:** (e.g. "EarlyStopping patience=8 exhausted at epoch N"; "max_epochs reached")
 - **Best checkpoint:** `lightning_logs/<run>/checkpoints/best-epoch=<n>-val/auroc=<x>.ckpt` (epoch N)
-- **Test (CODE-15% held-out, N samples, P% positive):** AUROC , AUPRC , TPR@5%FPR , TPR@top-5%
-- **PTB-XL fold-10 check:** (what the script printed, verbatim)
+- **Val (CODE-15%, best checkpoint, N samples, P% positive):** AUROC , AUPRC , TPR@5%FPR , TPR@top-5%
+- **PTB-XL fold-10 check:** (the `PTB-XL fold 10: n=... flagged=...%` line, verbatim)
+- **val_preds.csv:** `lightning_logs/<run>/val_preds.csv`; `length_diagnostic.py` output (verbatim)
 - **Wall time:** launch to test-eval end
 - **Pod-hours billed this run:**
 - **Anomalies (factual):**

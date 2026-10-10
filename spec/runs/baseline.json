@@ -1,14 +1,14 @@
 {
-  "sweep": "baseline-TODO",
+  "sweep": "baseline-crop2934",
   "owner_note": "User-owned. Infra copied from lr-sweep.json as a starting point. common_args, runs, cap_usd and code_sha are YOUR design decisions; this template has no planned runs and a code_sha that fails the launcher's pin check until you set it.",
-  "code_sha": "TODO_SET_AFTER_FIXES_ARE_COMMITTED",
+  "code_sha": "dc8e7e8",
   "code_paths_pinned": [
     "src/",
     "pyproject.toml",
     "uv.lock"
   ],
   "budget": {
-    "cap_usd": 0,
+    "cap_usd": 3,
     "max_pod_hours": 2,
     "max_concurrent_pods": 1,
     "approval_ttl_hours": 8,
@@ -59,7 +59,17 @@
     "--eval-test",
     "--wandb"
   ],
-  "runs": [],
+  "runs": [
+    {
+      "name": "baseline-crop2934",
+      "status": "planned",
+      "args": [
+        "--lr",
+        "1e-3"
+      ],
+      "note": "First run on the fixed pipeline: decisions 0001, 0002, 0004, 0005, 0006, 0007."
+    }
+  ],
   "failure_policy": {
     "crash_or_nan": "Report the log tail verbatim and halt the sweep. No retry, no flag changes. sweep_driver.sh enforces this: a run that exits without a test-eval block stops the sweep.",
     "gpu_out_of_stock": "Fall through gpu_preference_order once. If none available, report and halt; do not pick a GPU outside the list.",
