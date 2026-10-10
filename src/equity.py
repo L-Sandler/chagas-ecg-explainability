@@ -146,7 +146,10 @@ def main() -> None:
     from train import ECGLightningModule  # heavy import kept out of module scope
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--checkpoint", required=True)
+    ap.add_argument("--checkpoint", default=None)
+    ap.add_argument("--preds", default=None,
+                    help="val_preds.csv written by train.py (notes/decisions/0007). Skips the "
+                         "checkpoint and HDF5 files; the split is taken from the file.")
     ap.add_argument("--hdf5", nargs="+", default=["data/code15/exams_part0.hdf5"])
     ap.add_argument("--labels", default="data/code15/code15_chagas_labels.csv")
     ap.add_argument("--exams-csv", default=None)
@@ -160,17 +163,26 @@ def main() -> None:
     ap.add_argument("--out-dir", default="reports/equity")
     args = ap.parse_args()
 
-    ds = Code15Dataset(args.hdf5, args.labels, split=args.split,
-                       exams_csv=args.exams_csv, unlock_final=args.unlock_final)
-    module = ECGLightningModule.load_from_checkpoint(args.checkpoint, map_location="cpu")
-    probs = predict_probs(module, ds, args.batch_size, args.num_workers, args.device)
+    if args.preds:
+        df = pd.read_csv(args.preds)
+        df["is_male"] = df["is_male"].astype(bool)
+        probs = df["prob"].to_numpy()
+        n_exams, source = len(df), args.preds
+    else:
+        if not args.checkpoint:
+            ap.error("give --checkpoint or --preds")
+        ds = Code15Dataset(args.hdf5, args.labels, split=args.split,
+                           exams_csv=args.exams_csv, unlock_final=args.unlock_final)
+        module = ECGLightningModule.load_from_checkpoint(args.checkpoint, map_location="cpu")
+        probs = predict_probs(module, ds, args.batch_size, args.num_workers, args.device)
+        df, n_exams, source = ds.df, len(ds), args.checkpoint
 
-    rep = subgroup_report(ds.df, probs, n_boot=args.n_boot)
+    rep = subgroup_report(df, probs, n_boot=args.n_boot)
     os.makedirs(args.out_dir, exist_ok=True)
     stem = os.path.join(args.out_dir, f"{args.split}")
     rep.to_csv(stem + "_subgroups.csv", index=False)
-    pd.DataFrame({"exam_id": ds.df["exam_id"], "prob": probs}).to_csv(stem + "_preds.csv", index=False)
-    print(f"checkpoint: {args.checkpoint}\nsplit: {args.split}  exams: {len(ds)}  "
+    pd.DataFrame({"exam_id": df["exam_id"], "prob": probs}).to_csv(stem + "_preds.csv", index=False)
+    print(f"source: {source}\nsplit: {args.split}  exams: {n_exams}  "
           f"bootstrap: {args.n_boot} patient-level resamples\n")
     print(format_report(rep))
     print(f"\nwrote {stem}_subgroups.csv and {stem}_preds.csv")

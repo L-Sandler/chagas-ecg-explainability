@@ -49,12 +49,13 @@ from preprocess import (
     CODE15_LEAD_ORDER,
     SAMITROP_LEAD_ORDER,
     LEAD_ORDER,
+    TARGET_LEN,
     _bandpass,
     preprocess_signal,
     preprocess_ecg,
 )
 
-EXPECTED_OUTPUT_SHAPE = (12, 4000)
+EXPECTED_OUTPUT_SHAPE = (12, TARGET_LEN)
 EXPECTED_OUTPUT_DTYPE = np.float32
 
 
@@ -74,7 +75,7 @@ class Check:
 
 
 def _check_preprocessed_output(arr: np.ndarray) -> list[Check]:
-    """arr: [N, 12, 4000] preprocessed batch."""
+    """arr: [N, 12, TARGET_LEN] preprocessed batch."""
     out = []
     ok_shape = arr.shape[1:] == EXPECTED_OUTPUT_SHAPE and arr.dtype == EXPECTED_OUTPUT_DTYPE
     out.append(Check(
@@ -96,8 +97,8 @@ def _check_preprocessed_output(arr: np.ndarray) -> list[Check]:
     # full-window std will be <1 for 7s recordings. We detect the real end by the
     # last nonzero time step across all leads.
     per_means, per_stds = [], []
-    for sample in arr:  # [12, 4000]
-        any_nonzero = np.any(sample != 0, axis=0)  # [4000]
+    for sample in arr:  # [12, TARGET_LEN]
+        any_nonzero = np.any(sample != 0, axis=0)  # [TARGET_LEN]
         end = int(np.where(any_nonzero)[0][-1]) + 1 if any_nonzero.any() else sample.shape[1]
         real = sample[:, :end]
         per_means.append(real.mean(axis=-1))
@@ -459,7 +460,8 @@ def check_pre_fix_vs_post_fix() -> list[Check]:
         raw = f["tracings"][0]  # [4096, 12] float32
 
     pre = _original_inline_preprocess(raw)                                       # [12, 4000]
-    post = preprocess_signal(raw, fs=400.0, sig_names=CODE15_LEAD_ORDER)         # [12, 4000]
+    post = preprocess_signal(raw, fs=400.0, sig_names=CODE15_LEAD_ORDER)         # [12, TARGET_LEN]
+    pre = pre[:, :post.shape[1]]  # legacy output is 4000 long; compare the common window
 
     fs = 400
     # Use lead II (index 1) — has clearest QRS and widest dynamic range

@@ -47,6 +47,7 @@ import numpy as np
 
 from model import ECGResNet
 from dataset import Code15Dataset, SamiTropDataset, PTBXLDataset
+from preprocess import TARGET_LEN
 
 
 class ECGLightningModule(pl.LightningModule):
@@ -155,7 +156,7 @@ def _load_best_checkpoint(trainer: pl.Trainer, module: ECGLightningModule) -> EC
     return ECGLightningModule.load_from_checkpoint(best, map_location="cpu")
 
 
-def _eval_test(module: ECGLightningModule, test_ds: Code15Dataset, batch_size: int, num_workers: int, accelerator: str) -> None:
+def _eval_test(module: ECGLightningModule, test_ds, batch_size: int, num_workers: int, accelerator: str) -> tuple[np.ndarray, np.ndarray]:
     """Run one pass over the given dataset and print metrics. NOTE: despite the name this is
     never the locked-final split (notes/decisions/0004); the header keeps the string
     'TEST SET RESULTS' only because scripts/sweep_driver.sh greps for it."""
@@ -189,6 +190,26 @@ def _eval_test(module: ECGLightningModule, test_ds: Code15Dataset, batch_size: i
     else:
         print("  (no positives in test set — metrics not meaningful)")
     print("========================\n")
+    return probs, labels
+
+
+def _top_frac_cutoff(probs: np.ndarray, k_frac: float = 0.05) -> float:
+    """Probability of the k-th highest score, k as in _tpr_at_top_k: flagged = prob >= cutoff."""
+    k = int(np.ceil(k_frac * len(probs)))
+    return float(np.sort(probs)[::-1][k - 1])
+
+
+def _write_val_preds(ds: Code15Dataset, probs: np.ndarray, out_dir: str) -> None:
+    """Per-exam val predictions of the best checkpoint (notes/decisions/0007), for equity.py
+    --preds and length_diagnostic.py. n_real = original unpadded length (0006)."""
+    import pandas as pd
+    df = ds.df[["exam_id", "patient_id", "chagas", "is_male", "age", "band"]].copy()
+    df["n_real"] = ds.real_lengths()
+    df["prob"] = probs
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, "val_preds.csv")
+    df.to_csv(path, index=False)
+    print(f"Wrote {len(df)} val predictions to {path}")
 
 
 def main():
@@ -250,6 +271,7 @@ def main():
     # separately via --eval-test for specificity checks.
     # Skipped in --fast mode: fast is for verifying the CODE-15% pipeline path only.
     aux_train: list = []
+    st_ds = ptb_train = None
     if args.samitrop and not args.fast:
         st_ds = SamiTropDataset(args.samitrop)
         aux_train.append(st_ds)
@@ -263,7 +285,14 @@ def main():
 
     print(f"CODE-15% parts loaded: {len(hdf5_paths)}")
     print(f"Train total: {len(train_ds)} samples  |  Val (CODE-15%): {len(val_ds)} samples")
-    print(f"Pos weight (CODE-15% train split): {c15_train.pos_weight():.1f}")
+    # notes/decisions/0007: negatives/positives over everything the loss sees. SaMi-Trop is all
+    # positive and PTB-XL all negative.
+    n_st = len(st_ds) if st_ds is not None else 0
+    n_ptb = len(ptb_train) if ptb_train is not None else 0
+    c15_pos = int(c15_train.df["chagas"].sum())
+    pos_weight = (len(c15_train) - c15_pos + n_ptb) / max(c15_pos + n_st, 1)
+    print(f"Pos weight (full train set): {pos_weight:.1f}  "
+          f"(CODE-15% train only would be {c15_train.pos_weight():.1f})")
     print(f"Accelerator: {args.accelerator}  |  AMP: {args.amp}  |  Workers: {args.num_workers}")
 
     loader_kwargs = dict(
@@ -274,10 +303,12 @@ def main():
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,  **loader_kwargs)
     val_loader   = DataLoader(val_ds,   batch_size=args.batch_size, shuffle=False, **loader_kwargs)
 
-    module = ECGLightningModule(pos_weight=c15_train.pos_weight(), lr=args.lr)
+    module = ECGLightningModule(pos_weight=pos_weight, lr=args.lr)
 
     run_config = {
-        "pos_weight": c15_train.pos_weight(),
+        "pos_weight": pos_weight,
+        "pos_weight_code15_only": c15_train.pos_weight(),
+        "input_len": TARGET_LEN,
         "batch_size": args.batch_size,
         "epochs": args.epochs,
         "lr": args.lr,
@@ -286,10 +317,8 @@ def main():
         "dataset_sizes": {
             "code15_train": len(c15_train),
             "code15_val": len(val_ds),
-            "samitrop_train": len(aux_train[0]) if args.samitrop and not args.fast else 0,
-            "ptbxl_train": (
-                len(aux_train[-1]) if args.ptbxl and not args.fast else 0
-            ),
+            "samitrop_train": n_st,
+            "ptbxl_train": n_ptb,
         },
     }
 
@@ -332,12 +361,18 @@ def main():
     if args.eval_val:
         module = _load_best_checkpoint(trainer, module)
         print("\n--- CODE-15% val split (the split used for checkpoint selection, so optimistic) ---")
-        _eval_test(module, val_ds, args.batch_size, args.num_workers, args.accelerator)
+        val_probs, _ = _eval_test(module, val_ds, args.batch_size, args.num_workers, args.accelerator)
+        _write_val_preds(val_ds, val_probs,
+                         f"lightning_logs/{args.run_name}" if args.run_name else (trainer.log_dir or "."))
 
         if args.ptbxl:
-            print("--- PTB-XL fold 10 (specificity check, all negative) ---")
+            print("--- PTB-XL fold 10 (all negative): fraction flagged at the val top-5% cutoff ---")
             ptb_test = PTBXLDataset(args.ptbxl, split="test")
-            _eval_test(module, ptb_test, args.batch_size, args.num_workers, args.accelerator)
+            ptb_probs, _ = _eval_test(module, ptb_test, args.batch_size, args.num_workers, args.accelerator)
+            cutoff = _top_frac_cutoff(val_probs)
+            print(f"  PTB-XL fold 10: n={len(ptb_probs)}  mean prob={ptb_probs.mean():.4f}  "
+                  f"median={np.median(ptb_probs):.4f}  val top-5% cutoff={cutoff:.4f}  "
+                  f"flagged={100 * (ptb_probs >= cutoff).mean():.2f}%")
 
 
 if __name__ == "__main__":

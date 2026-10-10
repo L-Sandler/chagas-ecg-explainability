@@ -56,7 +56,7 @@ class ECGResNet(nn.Module):
     """
     1D ResNet for 12-lead ECG binary classification.
 
-    Input:  [B, 12, 4000]
+    Input:  [B, 12, T] (T = 2934 in training; any length works)
     Output: [B] logits (use BCEWithLogitsLoss)
     """
 
@@ -68,7 +68,7 @@ class ECGResNet(nn.Module):
             nn.Conv1d(n_leads, base_channels, kernel_size=15, padding=7, bias=False),
             nn.BatchNorm1d(base_channels),
             nn.ReLU(),
-            nn.MaxPool1d(2),  # 4000 → 2000
+            nn.MaxPool1d(2),  # T → T/2
         )
 
         # Stack residual blocks, doubling channels every two blocks, halving time dim

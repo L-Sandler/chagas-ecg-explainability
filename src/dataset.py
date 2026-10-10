@@ -199,6 +199,17 @@ class Code15Dataset(Dataset):
             self._hdf5_handles[file_idx] = h5py.File(self.hdf5_paths[file_idx], "r")
         return self._hdf5_handles[file_idx]
 
+    def real_lengths(self) -> np.ndarray:
+        """Original (unpadded) length in samples of every row of self.df: the span between the
+        first and last non-zero sample. ~2934 for 7 s recordings, 4096 for 10 s ones.
+        Reads the raw HDF5 once; used for the length diagnostic (notes/decisions/0006)."""
+        out = np.zeros(len(self.df), dtype=int)
+        for i, eid in enumerate(self.df["exam_id"].values):
+            file_idx, row = self._id_to_pos[int(eid)]
+            nz = np.flatnonzero(np.any(self._get_hdf5(file_idx)["tracings"][row] != 0, axis=1))
+            out[i] = nz[-1] - nz[0] + 1 if nz.size else 0
+        return out
+
     def pos_weight(self) -> float:
         """Ratio of negatives to positives — pass to BCEWithLogitsLoss."""
         n_pos = self.df["chagas"].sum()
@@ -214,7 +225,7 @@ class Code15Dataset(Dataset):
 
         f = self._get_hdf5(file_idx)
         signal = f["tracings"][row_in_file]  # [T, 12], float32
-        signal = preprocess_signal(signal, fs=400.0, sig_names=CODE15_LEAD_ORDER)  # [12, 4000]
+        signal = preprocess_signal(signal, fs=400.0, sig_names=CODE15_LEAD_ORDER)  # [12, TARGET_LEN]
 
         label = float(row["chagas"])
         return torch.from_numpy(signal), torch.tensor(label, dtype=torch.float32)
@@ -293,5 +304,5 @@ class PTBXLDataset(Dataset):
     def __getitem__(self, idx):
         rel_path = self.df.iloc[idx]["filename_lr"]  # e.g. records100/00000/00001_lr
         full_path = os.path.join(self.ptbxl_root, rel_path)
-        signal = preprocess_ecg(full_path)  # [12, 4000], 100→400 Hz resampling in preprocess_ecg
+        signal = preprocess_ecg(full_path)  # [12, TARGET_LEN], 100→400 Hz resampling in preprocess_ecg
         return torch.from_numpy(signal), torch.tensor(0.0, dtype=torch.float32)

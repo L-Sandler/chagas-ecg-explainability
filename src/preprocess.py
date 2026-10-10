@@ -1,9 +1,11 @@
+import math
+
 import numpy as np
 import wfdb
 from scipy.signal import butter, filtfilt, resample
 
 TARGET_FS = 400
-TARGET_LEN = 4000  # 10 seconds at 400 Hz
+TARGET_LEN = 2934  # 7.3 s at 400 Hz: the real length of a short recording (notes/decisions/0006)
 LEAD_ORDER = ["I", "II", "III", "AVR", "AVL", "AVF", "V1", "V2", "V3", "V4", "V5", "V6"]
 
 # HDF5-based datasets store leads in this order (confirmed from dataset schemas).
@@ -68,11 +70,14 @@ def preprocess_signal(signal: np.ndarray, fs: float, sig_names: list[str]) -> np
         sig_names: lead names in the order they appear in signal columns
 
     Returns:
-        [12, 4000] float32 — reordered, bandpassed, resampled, length-fixed, z-scored
+        [12, TARGET_LEN] float32 — reordered, bandpassed, resampled, length-fixed, z-scored
     """
     signal = signal.astype(np.float64)
     signal = _reorder_leads(signal, sig_names)
     signal = _strip_zero_padding(signal)
+    # Crop at native fs BEFORE filtering so filter edges sit at both ends of every window
+    # (notes/decisions/0006); the resample below can overshoot by a sample or two.
+    signal = signal[: math.ceil(TARGET_LEN * fs / TARGET_FS)]
     signal = _bandpass(signal, fs)
     signal = _resample_to_target(signal, fs)
     # Truncate first so normalization stats are computed over exactly the kept samples.
@@ -81,11 +86,11 @@ def preprocess_signal(signal: np.ndarray, fs: float, sig_names: list[str]) -> np
         signal = signal[:TARGET_LEN]
     signal = _normalize(signal)
     signal = _fix_length(signal)  # only pads here; truncation already done above
-    return signal.T.astype(np.float32)  # [12, 4000]
+    return signal.T.astype(np.float32)  # [12, TARGET_LEN]
 
 
 def preprocess_ecg(path: str) -> np.ndarray:
-    """Read a WFDB record and return a preprocessed [12, 4000] float32 array."""
+    """Read a WFDB record and return a preprocessed [12, TARGET_LEN] float32 array."""
     record = wfdb.rdrecord(path)
     signal = record.p_signal.copy()  # [T, 12], float64
     return preprocess_signal(signal, record.fs, record.sig_name)
