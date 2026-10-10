@@ -107,3 +107,6 @@ Items here are captured quickly during focused work. Triage regularly to keep th
 - [x] **[P1][BUG]** Silent label drop in `Code15Dataset.__init__`
   - _Fixed: 2026-07-21 | Option (b): `Code15Dataset.__init__` now prints `"[Code15Dataset] N/M HDF5 records had no label row; excluded."` before filtering. Verified count matches audit: 62/20001 on part0._
 
+
+- [ ] **[IMPROVEMENT]** Typeset the paper in LaTeX (arXiv single-column)
+  - _Added: 2026-10-10 | Deferred; paper starts as `paper/draft.md`. Plan: `paper/main.tex` (article, 11pt, natbib/plainnat) with one file per section, `refs.bib`, figures exported as PDF. Build with tectonic via the VSCode LaTeX Workshop extension (already installed). Convert once the draft is stable or a venue is picked._
