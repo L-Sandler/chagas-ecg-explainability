@@ -51,7 +51,11 @@ forward/backward of `ECGResNet`. It prints the environment as JSON.
 - Call `.venv/bin/python` directly (as `launch_run.py` does). `uv run` without `--frozen` can
   re-resolve and resync the venv.
 - Before the lock existed the pod venv was hand-installed. That package list is recorded in
-  `runs/_env-pre-lock.json` once the setup session has run (see `notes/runs.md`).
+  `runs/_env-pre-lock.json` (numpy 2.4.4 there; the lock has 1.26.4). The old venv is kept on the
+  volume as `.venv-handinstalled-2026-06`.
+- `uv sync` onto the network volume can fail with `Stale file handle (os error 116)` when other
+  jobs are reading the volume. Rerun it alone, with `UV_CONCURRENT_INSTALLS=4 UV_LINK_MODE=copy`.
+  The first `env_check` after a fresh install took ~3 min (cold reads from the volume).
 
 ## 3. Data
 
@@ -115,3 +119,7 @@ uv run --frozen python src/train.py --hdf5 data/code15/exams_part0.hdf5 \
 - No `rsync` on the pod image: pull with `scp`. Checkpoint paths contain a literal `val/`
   directory (metric name `val/auroc`); use `find`, not a `*.ckpt` glob.
 - Stopped pods can fail to restart when host capacity shifts: delete rather than stop.
+- Agent sessions: the sandbox exempts `ssh`, `runpodctl` and `./scripts/create_pod.sh` only as a
+  bare command (no pipe, redirect, `;`, `$()` or `cd … &&` prefix). `&&` inside the quoted
+  remote ssh command is fine. Do not mention `scripts/create_pod.sh` in any other command: the
+  hook reads that as a pod create and records a pod that does not exist.
