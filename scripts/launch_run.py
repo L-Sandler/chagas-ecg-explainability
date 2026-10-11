@@ -7,14 +7,19 @@ What it enforces (so the run record does not depend on anyone's memory):
   * run-name must exist in the manifest with status "planned"
   * working tree clean (tracked files) and src/, pyproject.toml, uv.lock identical to code_sha
   * driver CUDA >= manifest min_cuda_version
+  * the venv equals uv.lock (`uv sync --frozen --check`) and scripts/env_check.py --require-gpu passes
+  * every input file the command names is in spec/data-manifest.json with the recorded size
+    (the full sha256 check is `python3 scripts/data_manifest.py --verify`, once per pod)
   * refuses to overwrite an existing log for the same run
-  * writes a header (timestamp, HEAD, code-pin check, host, GPU, full command) to the log
-    and a sidecar train_<run>.meta.json, then launches detached (nohup semantics)
+  * writes a header (timestamp, HEAD, code-pin check, host, GPU, env, data-manifest sha256,
+    full command) to the log, a sidecar train_<run>.meta.json and train_<run>.env.json
+    (the env_check output), then launches detached (nohup semantics)
 """
 import argparse
 import json
 import os
 import shlex
+import shutil
 import socket
 import subprocess
 import sys
@@ -31,6 +36,57 @@ def sh(cmd: list) -> str:
 def fail(msg: str) -> None:
     print(f"LAUNCH REFUSED: {msg}", file=sys.stderr)
     sys.exit(1)
+
+
+ENV_KEYS = ("python", "torch", "torch_cuda", "cudnn", "driver", "driver_cuda_max", "gpu",
+            "pytorch_lightning", "numpy", "scipy", "h5py", "uv", "uv_lock_sha256")
+
+
+def input_paths(argv: list) -> list:
+    """Repo-relative input files and directories named on the training command line."""
+    paths, i = [], 0
+    while i < len(argv):
+        if argv[i] == "--hdf5":
+            i += 1
+            while i < len(argv) and not argv[i].startswith("--"):
+                paths.append(argv[i])
+                i += 1
+        elif argv[i] in ("--labels", "--samitrop", "--ptbxl", "--exams-csv") and i + 1 < len(argv):
+            paths.append(argv[i + 1])
+            i += 2
+        else:
+            i += 1
+    if "--exams-csv" not in argv and "--labels" in argv:  # train.py default: next to the labels CSV
+        paths.append(str(Path(argv[argv.index("--labels") + 1]).parent / "exams.csv"))
+    return sorted(set(paths))
+
+
+def check_environment(py: str) -> dict:
+    """venv == lock, and the CUDA path works. Returns the env_check JSON."""
+    uv = shutil.which("uv") or ("/workspace/bin/uv" if Path("/workspace/bin/uv").exists() else None)
+    if not uv:
+        fail("uv not found (PATH or /workspace/bin/uv); run scripts/setup_runpod.sh")
+    r = subprocess.run([uv, "sync", "--frozen", "--check"], cwd=ROOT, capture_output=True, text=True)
+    if r.returncode != 0:
+        fail("venv does not match uv.lock (`uv sync --frozen --check`):\n" + (r.stdout + r.stderr)[-600:])
+    r = subprocess.run([py, "scripts/env_check.py", "--require-gpu"], cwd=ROOT, capture_output=True, text=True)
+    try:
+        env = json.loads(r.stdout)
+    except ValueError:
+        fail("env_check.py produced no JSON:\n" + (r.stdout + r.stderr)[-600:])
+    if r.returncode != 0:
+        fail("env_check.py failed: " + "; ".join(env.get("failures", ["see its output"])))
+    return env
+
+
+def check_data(paths: list) -> str:
+    """Every input is in spec/data-manifest.json with the recorded size. Returns the manifest sha256."""
+    r = subprocess.run([sys.executable, "scripts/data_manifest.py", "--verify", "--quick", "--paths", *paths],
+                       cwd=ROOT, capture_output=True, text=True)
+    if r.returncode != 0:
+        fail("input files do not match spec/data-manifest.json:\n" + (r.stdout + r.stderr)[-800:])
+    return subprocess.run([sys.executable, "scripts/data_manifest.py", "--manifest-sha256"],
+                          cwd=ROOT, capture_output=True, text=True).stdout.strip()
 
 
 def main() -> None:
@@ -88,6 +144,10 @@ def main() -> None:
     if log.exists() and not a.dry_run:
         fail(f"{log.name} already exists; will not overwrite a prior run log")
 
+    env = check_environment(py)
+    inputs = input_paths(argv)
+    manifest_sha = check_data(inputs)
+
     header = {
         "run_name": a.run_name,
         "launched_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -101,6 +161,11 @@ def main() -> None:
         "code_pin_ok": code_pin_ok,
         "manifest": a.manifest,
         "command": " ".join(shlex.quote(t) for t in argv),
+        "env": {k: env.get(k) for k in ENV_KEYS},
+        "env_file": f"train_{a.run_name}.env.json",
+        "data_manifest": "spec/data-manifest.json",
+        "data_manifest_sha256": manifest_sha,
+        "data_inputs_checked": inputs,
         "n_hdf5_parts": sum(1 for t in argv if t.endswith(".hdf5") and "code15" in t),
         "log": str(log),
     }
@@ -110,6 +175,7 @@ def main() -> None:
         print("DRY RUN - nothing launched.")
         return
 
+    (ROOT / f"train_{a.run_name}.env.json").write_text(json.dumps(env, indent=2) + "\n")
     with log.open("w") as fh:
         fh.write("=== LAUNCH HEADER (scripts/launch_run.py) ===\n")
         fh.write(json.dumps(header, indent=2) + "\n")

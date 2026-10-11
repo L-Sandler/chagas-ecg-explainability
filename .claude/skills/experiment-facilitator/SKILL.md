@@ -45,8 +45,15 @@ versions unless a decision record says they are comparable.
 - Data needed on the pod: `data/code15/exams_part*.hdf5`, `data/code15/code15_chagas_labels.csv`,
   `data/code15/exams.csv` (the split universe; training refuses to start without it),
   `data/samitrop/exams.hdf5`, `data/ptbxl/`. Check with `ls` before launching.
-- Do **not** run `uv sync` on the pod: the lock file resolves a CPU torch wheel; the volume's
-  venv already has the cu124 build. `scripts/launch_run.py` verifies driver CUDA ≥ 12.4.
+- The environment comes from `uv.lock` (torch 2.6.0+cu124 on Linux) through
+  `bash scripts/setup_runpod.sh`: pinned uv in `/workspace/bin`, `uv sync --frozen`,
+  `env_check.py --require-gpu`. Never `uv add`, `uv lock`, `uv pip install` or an unfrozen
+  `uv sync` on the pod; a lock change is a local commit. `launch_run.py` refuses when the
+  venv differs from the lock, when `env_check` fails, or when an input file is missing from
+  or a different size than `spec/data-manifest.json`.
+- `spec/data-manifest.json` is the record of every input file (size, sha256, source).
+  `python3 scripts/data_manifest.py --verify` is the full check, once per pod;
+  `scripts/download_data.sh` fetches whatever is missing and ends with it.
 - GPU: manifest `gpu_preference_order` decides. `scripts/create_pod.sh` checks live stock and
   walks that order. Stock fluctuates and low-stock listings are racy.
 - Long SSH commands MUST be detached — sessions drop mid-command without warning; recover
@@ -118,18 +125,21 @@ From the manifest's `failure_policy`:
    `./scripts/create_pod.sh` — checks stock, picks per preference order, passes keys into the
    pod env so it can self-terminate.
 3. Agent: `runpodctl pod get <id>` for SSH host/port. On the pod: `git pull`, `nvidia-smi`,
-   `git rev-parse HEAD`, `ls data/code15/exams.csv data/code15/code15_chagas_labels.csv`.
-   If `exams.csv` is missing, ask the user.
-4. Agent: `python3 scripts/launch_run.py <run> --manifest <manifest> --dry-run` to confirm the
-   checks pass.
+   `git rev-parse HEAD`. If the venv is new or the lock changed: `bash scripts/setup_runpod.sh`.
+   Then `python3 scripts/data_manifest.py --verify` (full sha256, once per pod). If a file is
+   missing or differs, stop and ask the user.
+4. Agent: `python3 scripts/launch_run.py <run> --manifest <manifest> --dry-run`; paste the
+   header (including `env` and `data_manifest_sha256`) verbatim.
 5. Agent: start the driver detached, with the manifest:
    `setsid ./scripts/sweep_driver.sh <manifest> > sweep_driver.log 2>&1 < /dev/null &`
 6. Agent: monitor `sweep_driver.log` and `train_<run>.log`; report results as they land, verbatim.
 7. Agent: `scp` the run directory (`lightning_logs/<run>/`, including `val_preds.csv`),
-   `train_<run>.log` and `train_<run>.meta.json` to local `lightning_logs/<run>/`. Run
-   `python src/length_diagnostic.py` and `python src/equity.py --preds` on the local
-   `val_preds.csv` and paste their output verbatim into `notes/runs.md`. Then
-   `touch outputs_pulled` on the pod to trigger termination.
+   `train_<run>.log`, `train_<run>.meta.json` and `train_<run>.env.json` to local
+   `lightning_logs/<run>/`. Run `python src/length_diagnostic.py` and
+   `python src/equity.py --preds` on the local `val_preds.csv` and paste their output verbatim
+   into `notes/runs.md`. Run `python3 scripts/collect_run.py lightning_logs/<run>` to write the
+   tracked `runs/<run>/` (committing it is the user's call). Then `touch outputs_pulled` on
+   the pod to trigger termination.
 8. Agent: confirm `runpodctl pod list` is `[]`, then run `python3 .claude/hooks/guard.py --ledger`
    and paste the output verbatim (this session's cost and the running total).
 9. User: set the run's `status` to `done` in the manifest; write interpretation elsewhere.
@@ -142,6 +152,7 @@ For every run, report back verbatim — not summarized or interpreted:
 - git SHA at time of run, and the code-pin check result.
 - Config as logged to W&B: `pos_weight`, `pos_weight_code15_only`, `input_len`, batch size,
   epochs, lr, git SHA, per-source dataset sizes.
+- The header's `env` block, `data_manifest_sha256` and the `train_<run>.env.json` sidecar.
 - Per-epoch metrics (`val/auroc`, `val/tpr_top5pct`, `val/tpr_at_5pct_fpr`, train loss).
 - Final val metrics of the best checkpoint (AUROC, AUPRC, TPR@5%FPR, TPR@top-5%), and the
   checkpoint path and epoch the log says it evaluated.
