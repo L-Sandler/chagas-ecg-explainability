@@ -43,7 +43,7 @@ DEFAULT_ASSUMED_USD_PER_HR = 1.0  # used when a manifest lists no usable GPU pri
 PROTECTED_PATHS = (
     ".guardrails/", ".claude/", "spec/runs/",  # notes/decisions/ has its own rule (propose-only)
     "scripts/launch_run.py", "scripts/sweep_driver.sh",
-    "spec/fable-experiment-facilitator-prompt.md", "CLAUDE.md",
+    "spec/experiment-facilitator-prompt.md", "CLAUDE.md",
     "README.md",  # root README only (rel == "README.md"): edited only with the user's permission
 )
 
@@ -67,7 +67,7 @@ ALWAYS_BLOCK = [
 # Writes that would modify guardrail config through the shell.
 WRITE_TOKENS = r"(\bsed\s+-i|\btee\b|\bmv\b|\bcp\b|\btouch\b|\btruncate\b|\bdd\b)"
 SHELL_PROTECTED = (r"\.guardrails", r"\.claude/", r"spec/runs", r"notes/decisions", r"launch_run\.py",
-                   r"sweep_driver\.sh", r"fable-experiment-facilitator-prompt", r"\bCLAUDE\.md",
+                   r"sweep_driver\.sh", r"experiment-facilitator-prompt", r"\bCLAUDE\.md",
                    r"(?<![\w/.-])README\.md")  # root README only; sub-dir READMEs unaffected
 # Redirections that are not file writes (2>&1, >/dev/null) must not trip the write check.
 NOISE_REDIRECTS = r"(\d*>&\d+|\d*>>?\s*/dev/null)"

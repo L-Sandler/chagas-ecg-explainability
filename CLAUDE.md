@@ -23,7 +23,7 @@ When connecting to a RunPod pod via SSH, apply the following discipline:
 
 ## Facilitator sessions (training-run execution)
 
-When the task is running training experiments, read `spec/fable-experiment-facilitator-prompt.md`
+When the task is running training experiments, read `spec/experiment-facilitator-prompt.md`
 first. The role there is execution + faithful recording only; model/hyperparameter choices
 and interpretation stay with the user. Runs come from `spec/runs/*.json`, launch via
 `scripts/launch_run.py`, and the PreToolUse hook in `.claude/hooks/guard.py` gates risky

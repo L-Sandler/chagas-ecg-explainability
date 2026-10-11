@@ -45,8 +45,8 @@
       "Edit(scripts/launch_run.py)",
       "Write(scripts/sweep_driver.sh)",
       "Edit(scripts/sweep_driver.sh)",
-      "Write(spec/fable-experiment-facilitator-prompt.md)",
-      "Edit(spec/fable-experiment-facilitator-prompt.md)",
+      "Write(spec/experiment-facilitator-prompt.md)",
+      "Edit(spec/experiment-facilitator-prompt.md)",
       "Write(CLAUDE.md)",
       "Edit(CLAUDE.md)"
     ]
