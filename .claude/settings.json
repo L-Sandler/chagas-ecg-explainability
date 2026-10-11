@@ -84,6 +84,7 @@
         "pypi.org",
         "files.pythonhosted.org",
         "download.pytorch.org",
+        "download-r2.pytorch.org",
         "api.wandb.ai",
         "github.com",
         "zenodo.org",
