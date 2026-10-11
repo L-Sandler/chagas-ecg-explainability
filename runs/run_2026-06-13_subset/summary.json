@@ -1,0 +1,188 @@
+{
+  "run": "run_2026-06-13_subset",
+  "source_dir": "lightning_logs/run_2026-06-13_subset",
+  "missing_files": [
+    "meta.json",
+    "env.json",
+    "val_preds.csv"
+  ],
+  "epochs": {
+    "0": {
+      "v_num": 3.0,
+      "val/loss": 1.37,
+      "val/auroc": 0.736,
+      "val/auprc": 0.0883,
+      "val/tpr_at_5pct": 0.271,
+      "train/loss": 1.62
+    },
+    "1": {
+      "v_num": 3.0,
+      "val/loss": 1.51,
+      "val/auroc": 0.753,
+      "val/auprc": 0.0584,
+      "val/tpr_at_5pct": 0.203,
+      "train/loss": 1.44
+    },
+    "2": {
+      "v_num": 3.0,
+      "val/loss": 3.56,
+      "val/auroc": 0.724,
+      "val/auprc": 0.0519,
+      "val/tpr_at_5pct": 0.153,
+      "train/loss": 1.35
+    },
+    "3": {
+      "v_num": 3.0,
+      "val/loss": 1.54,
+      "val/auroc": 0.741,
+      "val/auprc": 0.057,
+      "val/tpr_at_5pct": 0.186,
+      "train/loss": 1.31
+    },
+    "4": {
+      "v_num": 3.0,
+      "val/loss": 1.61,
+      "val/auroc": 0.756,
+      "val/auprc": 0.0747,
+      "val/tpr_at_5pct": 0.237,
+      "train/loss": 1.33
+    },
+    "5": {
+      "v_num": 3.0,
+      "val/loss": 1.8,
+      "val/auroc": 0.757,
+      "val/auprc": 0.0758,
+      "val/tpr_at_5pct": 0.271,
+      "train/loss": 1.18
+    },
+    "6": {
+      "v_num": 3.0,
+      "val/loss": 1.76,
+      "val/auroc": 0.77,
+      "val/auprc": 0.0789,
+      "val/tpr_at_5pct": 0.373,
+      "train/loss": 1.13
+    },
+    "7": {
+      "v_num": 3.0,
+      "val/loss": 1.43,
+      "val/auroc": 0.781,
+      "val/auprc": 0.132,
+      "val/tpr_at_5pct": 0.339,
+      "train/loss": 1.14
+    },
+    "8": {
+      "v_num": 3.0,
+      "val/loss": 1.69,
+      "val/auroc": 0.755,
+      "val/auprc": 0.0674,
+      "val/tpr_at_5pct": 0.305,
+      "train/loss": 1.09
+    },
+    "9": {
+      "v_num": 3.0,
+      "val/loss": 1.33,
+      "val/auroc": 0.781,
+      "val/auprc": 0.148,
+      "val/tpr_at_5pct": 0.373,
+      "train/loss": 1.09
+    },
+    "10": {
+      "v_num": 3.0,
+      "val/loss": 1.82,
+      "val/auroc": 0.733,
+      "val/auprc": 0.0699,
+      "val/tpr_at_5pct": 0.271,
+      "train/loss": 1.08
+    },
+    "11": {
+      "v_num": 3.0,
+      "val/loss": 1.52,
+      "val/auroc": 0.79,
+      "val/auprc": 0.092,
+      "val/tpr_at_5pct": 0.322,
+      "train/loss": 0.997
+    },
+    "12": {
+      "v_num": 3.0,
+      "val/loss": 1.69,
+      "val/auroc": 0.829,
+      "val/auprc": 0.141,
+      "val/tpr_at_5pct": 0.39,
+      "train/loss": 1.02
+    },
+    "13": {
+      "v_num": 3.0,
+      "val/loss": 1.44,
+      "val/auroc": 0.793,
+      "val/auprc": 0.0919,
+      "val/tpr_at_5pct": 0.305,
+      "train/loss": 0.992
+    },
+    "14": {
+      "v_num": 3.0,
+      "val/loss": 1.52,
+      "val/auroc": 0.724,
+      "val/auprc": 0.0785,
+      "val/tpr_at_5pct": 0.288,
+      "train/loss": 0.924
+    },
+    "15": {
+      "v_num": 3.0,
+      "val/loss": 1.23,
+      "val/auroc": 0.789,
+      "val/auprc": 0.0987,
+      "val/tpr_at_5pct": 0.305,
+      "train/loss": 0.898
+    },
+    "16": {
+      "v_num": 3.0,
+      "val/loss": 1.48,
+      "val/auroc": 0.779,
+      "val/auprc": 0.105,
+      "val/tpr_at_5pct": 0.339,
+      "train/loss": 0.856
+    },
+    "17": {
+      "v_num": 3.0,
+      "val/loss": 1.27,
+      "val/auroc": 0.768,
+      "val/auprc": 0.103,
+      "val/tpr_at_5pct": 0.339,
+      "train/loss": 0.824
+    }
+  },
+  "results_blocks": [
+    {
+      "section": "CODE-15% test split",
+      "lines": [
+        "samples:     2993",
+        "positives:   61 (2.0%)",
+        "AUROC:       0.7746",
+        "AUPRC:       0.0868",
+        "TPR@5%FPR:   0.3443"
+      ]
+    },
+    {
+      "section": "PTB-XL fold 10 (specificity check, all negative)",
+      "lines": [
+        "samples:     2198",
+        "positives:   0 (0.0%)",
+        "(no positives in test set \u2014 metrics not meaningful)"
+      ]
+    }
+  ],
+  "dataset_notes": [],
+  "traceback_tail": null,
+  "train_total": [
+    33023,
+    2972
+  ],
+  "log_file": "train.log",
+  "checkpoints": [
+    {
+      "path": "checkpoints/best-epoch=12-val/auroc=0.829.ckpt",
+      "bytes": 14123956
+    }
+  ]
+}

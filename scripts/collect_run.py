@@ -108,6 +108,7 @@ def main() -> int:
             missing.append(name)
 
     log = next((src / c for c in (f"train_{run}.log", "train.log") if (src / c).is_file()), None)
+    log = log or next(iter(sorted(src.glob("train*.log"))), None)  # older runs, e.g. train_full.log
     summary = {"run": run, "source_dir": str(src), "missing_files": missing}
     if log:
         lines = log_lines(log.read_text(errors="replace"))

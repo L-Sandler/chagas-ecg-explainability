@@ -1,0 +1,103 @@
+{
+  "run": "full-code15-10ep",
+  "source_dir": "lightning_logs/full-code15-10ep",
+  "missing_files": [
+    "meta.json",
+    "env.json",
+    "val_preds.csv"
+  ],
+  "epochs": {
+    "0": {
+      "val/loss": 1.06,
+      "val/auroc": 0.82,
+      "val/auprc": 0.113,
+      "val/tpr_at_5pct_fpr": 0.388,
+      "val/tpr_top5pct": 0.368,
+      "train/loss": 1.2
+    },
+    "1": {
+      "val/loss": 1.01,
+      "val/auroc": 0.836,
+      "val/auprc": 0.144,
+      "val/tpr_at_5pct_fpr": 0.423,
+      "val/tpr_top5pct": 0.403,
+      "train/loss": 1.15
+    },
+    "2": {
+      "val/loss": 0.979,
+      "val/auroc": 0.833,
+      "val/auprc": 0.142,
+      "val/tpr_at_5pct_fpr": 0.424,
+      "val/tpr_top5pct": 0.401,
+      "train/loss": 1.14
+    },
+    "3": {
+      "val/loss": 0.984,
+      "val/auroc": 0.83,
+      "val/auprc": 0.144,
+      "val/tpr_at_5pct_fpr": 0.42,
+      "val/tpr_top5pct": 0.393,
+      "train/loss": 1.12
+    },
+    "4": {
+      "val/loss": 0.989,
+      "val/auroc": 0.828,
+      "val/auprc": 0.143,
+      "val/tpr_at_5pct_fpr": 0.416,
+      "val/tpr_top5pct": 0.393,
+      "train/loss": 1.1
+    },
+    "5": {
+      "val/loss": 0.987,
+      "val/auroc": 0.829,
+      "val/auprc": 0.149,
+      "val/tpr_at_5pct_fpr": 0.419,
+      "val/tpr_top5pct": 0.395,
+      "train/loss": 1.09
+    },
+    "6": {
+      "val/loss": 0.99,
+      "val/auroc": 0.833,
+      "val/auprc": 0.155,
+      "val/tpr_at_5pct_fpr": 0.429,
+      "val/tpr_top5pct": 0.407,
+      "train/loss": 1.07
+    }
+  },
+  "results_blocks": [
+    {
+      "section": "CODE-15% test split",
+      "lines": [
+        "samples:     51529",
+        "positives:   991 (1.9%)",
+        "AUROC:              0.8296",
+        "AUPRC:              0.1403",
+        "TPR@5%FPR:          0.4036",
+        "TPR@top-5% (challenge score): 0.3804"
+      ]
+    },
+    {
+      "section": "PTB-XL fold 10 (specificity check, all negative)",
+      "lines": [
+        "samples:     2198",
+        "positives:   0 (0.0%)",
+        "(no positives in test set \u2014 metrics not meaningful)"
+      ]
+    }
+  ],
+  "dataset_notes": [
+    "[Code15Dataset] 2356/345780 HDF5 records had no label row; excluded."
+  ],
+  "traceback_tail": null,
+  "train_total": [
+    259824,
+    51120
+  ],
+  "log_file": "train_full.log",
+  "checkpoints": [
+    {
+      "path": "checkpoints/best-epoch=1-val/auroc=0.836.ckpt",
+      "bytes": 14124020
+    }
+  ]
+}
