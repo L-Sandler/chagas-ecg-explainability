@@ -72,6 +72,133 @@ Those logs do not contain the launch command, so their command is reconstructed,
 
 ---
 
+### setup + length scan  (2026-10-11)  no training; not a run in the table above
+
+Purpose (from the approved plan): rebuild the pod environment from `uv.lock`, record every input
+file's sha256 in `spec/data-manifest.json`, and scan the real length of all 18 CODE-15% parts
+(approved after the `baseline-crop2934` crash).
+
+- **Code:** pod `git pull` took the repo from `c74e8bb` to `3da92c4`, later to `657d9d9`. Manifest
+  `code_sha` `774ec79`, code-pin check pass (`code_pin_ok: true` in the dry-run header below).
+- **Pod:** `m9hjemzxxb9blt`, RTX 4090, EU-RO-1, driver 580.159.04 (CUDA 13.0), `$0.89/hr`, created
+  2026-10-11 20:13:45Z, deleted ~20:42Z. Ledger: 0.48 h = $0.42; total GPU spend $10.76 of $50.
+  RunPod balance before creating: $25.25. `runpodctl pod list` returned `[]` after delete.
+- **Environment before (hand-installed, every earlier number):** full list in
+  `runs/_env-pre-lock.json`. torch `2.6.0+cu124`, numpy `2.4.4`, scipy `1.17.1`, h5py `3.16.0`,
+  pytorch-lightning `2.6.1`, python `3.11.10`, cuDNN 90100. It also had both `nvidia-*-cu12`
+  and `nvidia-*-cu13` packages (e.g. `nvidia-cublas 13.1.0.3`, `nvidia-cudnn-cu13 9.19.0.56`,
+  `cuda-toolkit 13.0.2`). Moved to `/workspace/chagas-ecg-explainability/.venv-handinstalled-2026-06`
+  (not deleted).
+- **Environment after (`bash scripts/setup_runpod.sh`, `env_check.py --require-gpu`, verbatim):**
+  ```
+  {
+    "python": "3.11.10",
+    "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+    "git_head": "3da92c4",
+    "uv": "uv 0.11.7 (x86_64-unknown-linux-gnu)",
+    "uv_lock_sha256": "a97e8418c74f9a00c33f5816de5774ef47c86174c40ac6a901dcbe62532e8556",
+    "numpy": "1.26.4",
+    "scipy": "1.17.1",
+    "h5py": "3.16.0",
+    "pytorch_lightning": "2.6.1",
+    "torch": "2.6.0+cu124",
+    "torch_cuda": "12.4",
+    "cudnn": 90100,
+    "cuda_available": true,
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "driver": "580.159.04",
+    "driver_cuda_max": "13.0",
+    "forward_backward": {"device": "cuda", "amp_fp16": true, "logits_shape": [4],
+                         "loss": 0.6917272806167603, "grads_finite": true},
+    "failures": []
+  }
+  ```
+  The Mac's `uv.lock` sha256 is the same (`a97e8418...`). `uv sync --frozen --check` printed
+  `Would make no changes` / `venv matches uv.lock`.
+- **Setup anomaly (first attempt failed):** while `data_manifest.py --verify` was reading the
+  volume, `uv sync --frozen` stopped with
+  ```
+  error: Failed to install: jupyterlab-4.5.7-py3-none-any.whl (jupyterlab==4.5.7)
+    Caused by: Stale file handle (os error 116) at path ".../.venv/lib/python3.11/site-packages/jupyterlab/tests/mock_packages/test_no_hyphens/test_no_hyphens/.tmpLhTaJj"
+  ```
+  The script was rerun with `UV_CONCURRENT_INSTALLS=4 UV_LINK_MODE=copy`, with nothing else
+  running: `Installed 12 packages in 1m 24s`, then the check above. Logs on the volume:
+  `setup_runpod.log` (failed), `setup_runpod_retry.log`. The `env_check` step then took ~3 min
+  (`ps` showed the process in a filesystem wait, `request_wait_answer`) and passed.
+- **Data manifest:** `data_manifest.py --write` on the pod hashed parts 1-17 (kept the locally
+  recorded hashes for part0, `exams.csv`, labels CSV and SaMi-Trop); 23 entries. Committed as
+  `657d9d9`. `data_manifest.py --verify` (full sha256) on the pod:
+  `ptbxl: 87203 files, 0 bad` and
+  `verify (full sha256): PASSED  manifest sha256 c916c22a241ae46c4b5f379ceefd7b0202d27b5ab3846b909e289e67cda69520`.
+  The same sha256 as the local copy of `spec/data-manifest.json`. Both CSVs' md5 equal Zenodo's
+  published md5 (`md5_matches_published: true`). The zips are not on the volume, so the
+  published zip md5s are recorded, not compared.
+- **Length scan (`scan_lengths.py`, all 18 parts, 345,797 records; locked-split labels masked):**
+
+  | bin | n_records | n_labelled | n_chagas_pos (train+val) | n_train | n_val | n_locked | n_unlabelled |
+  |---|---|---|---|---|---|---|---|
+  | all-zero (real_len == 0) | 688 | 669 | 2 | 482 | 89 | 98 | 19 |
+  | 1..27 | 4 | 4 | 0 | 3 | 1 | 0 | 0 |
+  | 28..2933 | 4395 | 4373 | 5 | 3048 | 657 | 668 | 22 |
+  | == 2934 | 201084 | 199591 | 5308 | 139808 | 30050 | 29733 | 1493 |
+  | 2935..4095 | 8863 | 8795 | 7 | 6220 | 1336 | 1239 | 68 |
+  | == 4096 | 130763 | 129992 | 261 | 91027 | 19469 | 19496 | 771 |
+
+  Records with any non-finite value: 0. Most common real_len: 2934 (201084), 4096 (130763),
+  3874 (1261), 0 (688), 4000 (173). Part0 alone: 39 / 0 / 273 / 11675 / 477 / 7537, equal to the
+  2026-10-10 scan.
+- **Records with real_len 1..27 (`reports/length_scan_flagged.csv`, verbatim rows):**
+  ```
+  file,row,exam_id,real_len,first_nz,last_nz,n_nonzero_rows,max_abs,labelled,chagas,split
+  exams_part12.hdf5,14591,2829945,27,2108,2134,27,281.1352,True,False,train
+  exams_part15.hdf5,8559,2795803,27,1576,1602,27,281.1352,True,False,train
+  exams_part7.hdf5,895,1441593,27,3559,3585,27,243.90517,True,False,val
+  exams_part9.hdf5,15730,207914,27,1842,1868,27,219.28545,True,False,train
+  ```
+  All four have real_len 27 and none has a length in 1..26. The 2026-10-10 traceback reads
+  `ValueError: The length of the input vector x must be greater than padlen, which is 27.`
+  Which record raised it in that run is not recorded in that log.
+- **Files:** `reports/length_scan_summary.csv`, `reports/length_scan_flagged.csv` (tracked;
+  sha256 `77c3389c...` and `cb2090ec...`, equal to the pod's). Per-record scan
+  `reports/code15_length_scan.csv` (345,797 rows, 29,168,967 bytes, sha256
+  `12c943cec545f355e866406c9301ca613a30a0c4c7540a25bacaf77bb0966723`) is on the volume only
+  (git-ignored).
+- **Launcher dry-run (`python3 scripts/launch_run.py baseline-crop2934 --manifest spec/runs/baseline.json --dry-run`, over SSH):**
+  ```
+  "git_head": "657d9d9", "manifest_code_sha": "774ec79", "code_pin_ok": true,
+  "driver_cuda": 13.0, "pod_id": null,
+  "gpu": "| NVIDIA-SMI 580.159.04             Driver Version: 580.159.04     CUDA Version: 13.0     |",
+  "env": {"python": "3.11.10", "torch": "2.6.0+cu124", "torch_cuda": "12.4", "cudnn": 90100,
+          "driver": "580.159.04", "driver_cuda_max": "13.0", "gpu": "NVIDIA GeForce RTX 4090",
+          "pytorch_lightning": "2.6.1", "numpy": "1.26.4", "scipy": "1.17.1", "h5py": "3.16.0",
+          "uv": "uv 0.11.7 (x86_64-unknown-linux-gnu)",
+          "uv_lock_sha256": "a97e8418c74f9a00c33f5816de5774ef47c86174c40ac6a901dcbe62532e8556"},
+  "env_file": "train_baseline-crop2934.env.json",
+  "data_manifest_sha256": "c916c22a241ae46c4b5f379ceefd7b0202d27b5ab3846b909e289e67cda69520",
+  "data_inputs_checked": 22 paths (18 parts, labels CSV, exams.csv, samitrop hdf5, data/ptbxl),
+  "n_hdf5_parts": 18   ...   DRY RUN - nothing launched.
+  ```
+  Command string as in the 2026-10-10 entry above. `pod_id` is null and `gpu` is the
+  `nvidia-smi` table line because the SSH session has no `RUNPOD_*` env (same as 2026-10-10).
+- **Not done:** no training run, no launch marker, `baseline-crop2934` status still `planned`.
+  The PTB-XL download branch of `scripts/download_data.sh` was not exercised (data already on
+  the volume). `scripts/launch_run.py` full launch path (env sidecar write) was not exercised.
+- **Anomalies (factual):**
+  - `create_pod.sh` did not provision on the first three attempts: the sandbox denied
+    `api.runpod.io` (the redirect/pipe forms are not on the sandbox exemption), and the hook
+    recorded a stale pod twice (from a piped exit code, and from a `bash -n` syntax check naming
+    the script); the user cleared `.guardrails/state/pod-*` each time. The fourth attempt
+    created the pod. `scripts/create_pod.sh` now redacts keys from its output (`1544b56`).
+  - A first `git pull` on the pod needed `git checkout -- spec/data-manifest.json` because the
+    pod-written manifest differed from the committed one before the push.
+  - Two pod-side background jobs (`--write`, then `--verify`) ran concurrently with the first
+    `uv sync` attempt; see the stale-file-handle error above.
+  - An unmasked per-bin summary of part0 alone was viewed by the agent while testing
+    `scan_lengths.py` on the Mac, before label masking was added: 1 Chagas-positive among the
+    39 all-zero records, 4 of them in the locked split. The pod outputs above are masked.
+
+---
+
 ## Template: copy per run
 
 ### <run-name>  (<date>)
