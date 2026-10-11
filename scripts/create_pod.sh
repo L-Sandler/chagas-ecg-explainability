@@ -49,6 +49,12 @@ if [ -z "$WKEY" ]; then
   read -r -p "Continue anyway? [y/N] " a; [ "$a" = y ] || exit 1
 fi
 
+# `runpodctl pod create --wait` echoes the env block, keys included; nothing it prints leaves
+# this script unredacted (key-named fields, and any long token such as a 40-char W&B key).
+redact() {
+  sed -E 's/((API_KEY|api_key|apiKey)[^A-Za-z0-9]*)[A-Za-z0-9_.-]{8,}/\1[REDACTED]/g; s/[A-Za-z0-9_-]{36,}/[REDACTED]/g'
+}
+
 ENV_JSON=$(RP_KEY="$KEY" WB_KEY="$WKEY" python3 -c "
 import json, os
 d = {k: os.environ[v] for k, v in (('RUNPOD_API_KEY', 'RP_KEY'), ('WANDB_API_KEY', 'WB_KEY')) if os.environ.get(v)}
@@ -77,13 +83,13 @@ for x in g:
       runpodctl pod create --name "chagas-sweep" --template-id "$TEMPLATE" \
         --gpu-id "$gpu" --data-center-ids "$DC" --network-volume-id "$VOL" \
         --volume-mount-path "$MOUNT" --min-cuda-version "$CUDA" \
-        --env "$ENV_JSON" --wait
+        --env "$ENV_JSON" --wait 2>&1 | redact
     else
       runpodctl pod create --name "chagas-sweep" --template-id "$TEMPLATE" \
         --gpu-id "$gpu" --data-center-ids "$DC" --network-volume-id "$VOL" \
-        --volume-mount-path "$MOUNT" --min-cuda-version "$CUDA" --wait
+        --volume-mount-path "$MOUNT" --min-cuda-version "$CUDA" --wait 2>&1 | redact
     fi
-    rc=$?; set -e
+    rc=${PIPESTATUS[0]}; set -e
     [ $rc -eq 0 ] && { echo "Pod created on $gpu."; exit 0; }
     echo "Provisioning $gpu failed (low-stock listings are racy); trying next in the order." >&2
   else
