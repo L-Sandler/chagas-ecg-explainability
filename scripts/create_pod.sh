@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Provision the sweep pod. Reads the manifest for infra config, picks the first GPU in
 # gpu_preference_order that has stock in the right datacenter, and passes RUNPOD_API_KEY
-# into the pod env (read from ~/.runpod/config.toml) so the pod can self-terminate.
+# into the pod env (read from ~/.runpod/config.toml) so the pod can self-terminate, and
+# WANDB_API_KEY (from WANDB_API_KEY or the local ~/.netrc) so --wandb runs can log.
 #
 #   ./scripts/create_pod.sh [manifest]
 #
@@ -29,6 +30,31 @@ if [ -z "$KEY" ]; then
   read -r -p "Continue anyway? [y/N] " a; [ "$a" = y ] || exit 1
 fi
 
+# W&B auth: the pod's ~/.netrc is not on the volume, so a fresh pod is not logged in. Forward
+# the key from the local `wandb login` (~/.netrc) or an exported WANDB_API_KEY.
+WKEY="${WANDB_API_KEY:-}"
+if [ -z "$WKEY" ]; then
+  WKEY=$(python3 -c "
+import netrc
+try:
+    a = netrc.netrc().authenticators('api.wandb.ai')
+    print(a[2] if a and a[2] else '')
+except Exception:
+    print('')
+" 2>/dev/null || true)
+fi
+if [ -z "$WKEY" ]; then
+  echo "WARNING: no W&B key (WANDB_API_KEY unset, no api.wandb.ai entry in ~/.netrc)." >&2
+  echo "         Runs with --wandb will crash at trainer start and consume their launch marker." >&2
+  read -r -p "Continue anyway? [y/N] " a; [ "$a" = y ] || exit 1
+fi
+
+ENV_JSON=$(RP_KEY="$KEY" WB_KEY="$WKEY" python3 -c "
+import json, os
+d = {k: os.environ[v] for k, v in (('RUNPOD_API_KEY', 'RP_KEY'), ('WANDB_API_KEY', 'WB_KEY')) if os.environ.get(v)}
+print(json.dumps(d) if d else '')
+")
+
 echo "Checking stock in $DC for: ${GPUS//|/, }"
 STOCK=$(runpodctl gpu list -o json)
 
@@ -47,11 +73,11 @@ for x in g:
   if [ -n "$have" ]; then
     echo "-> $gpu has stock ($have) in $DC; provisioning"
     set +e
-    if [ -n "$KEY" ]; then
+    if [ -n "$ENV_JSON" ]; then
       runpodctl pod create --name "chagas-sweep" --template-id "$TEMPLATE" \
         --gpu-id "$gpu" --data-center-ids "$DC" --network-volume-id "$VOL" \
         --volume-mount-path "$MOUNT" --min-cuda-version "$CUDA" \
-        --env "{\"RUNPOD_API_KEY\":\"$KEY\"}" --wait
+        --env "$ENV_JSON" --wait
     else
       runpodctl pod create --name "chagas-sweep" --template-id "$TEMPLATE" \
         --gpu-id "$gpu" --data-center-ids "$DC" --network-volume-id "$VOL" \
