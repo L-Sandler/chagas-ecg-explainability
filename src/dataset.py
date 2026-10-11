@@ -55,6 +55,30 @@ AGE_BAND_LABELS = ("<40", "40-49", "50-59", "60-69", "70-79", "80+")
 
 _SPLIT_TABLE_CACHE: dict[tuple[str, str], pd.DataFrame] = {}
 
+# notes/decisions/0008: a CODE-15% record needs at least this many real (non-padding) samples.
+# 28 is the lowest length the bandpass can filter (filtfilt padlen 27); all-zero records have
+# length 0 and are excluded too.
+MIN_REAL_LEN = 28
+
+_REAL_LEN_CHUNK = 256
+_REAL_LEN_CACHE: dict[tuple[str, int], np.ndarray] = {}
+
+
+def _chunk_real_lengths(path: str, chunk: int) -> np.ndarray:
+    """Real length (first to last non-zero row, as in preprocess._strip_zero_padding; 0 for an
+    all-zero record) of the 256 records of `chunk` in one HDF5 part. Cached per process; the file
+    is opened and closed here so no handle is inherited by DataLoader workers."""
+    key = (path, chunk)
+    if key not in _REAL_LEN_CACHE:
+        lo = chunk * _REAL_LEN_CHUNK
+        with h5py.File(path, "r") as f:
+            x = f["tracings"][lo: lo + _REAL_LEN_CHUNK]  # [n, T, 12]
+        nz = np.any(x != 0, axis=2)                      # [n, T]
+        first = np.argmax(nz, axis=1)
+        last = x.shape[1] - 1 - np.argmax(nz[:, ::-1], axis=1)
+        _REAL_LEN_CACHE[key] = np.where(nz.any(axis=1), last - first + 1, 0)
+    return _REAL_LEN_CACHE[key]
+
 
 def age_band(age) -> np.ndarray:
     """Band index (0..5) into AGE_BAND_LABELS."""
@@ -185,10 +209,28 @@ class Code15Dataset(Dataset):
                 f"excluded."
             )
         table = table[table["exam_id"].isin(self._id_to_pos)]
-        df = table[table["split"] == split]
+        df = table[table["split"] == split].reset_index(drop=True)
 
-        if max_samples is not None:
-            df = df.iloc[:max_samples]
+        # notes/decisions/0008: drop records with < MIN_REAL_LEN real samples. This runs after the
+        # patient split is assigned (membership of every other record is unchanged) and before the
+        # max_samples cap, so a capped smoke run still gets max_samples usable records.
+        keep, n_checked = [], 0
+        for i, eid in enumerate(df["exam_id"].values):
+            file_idx, row = self._id_to_pos[int(eid)]
+            n_real = _chunk_real_lengths(self.hdf5_paths[file_idx], row // _REAL_LEN_CHUNK)[
+                row % _REAL_LEN_CHUNK]
+            n_checked += 1
+            if n_real >= MIN_REAL_LEN:
+                keep.append(i)
+                if max_samples is not None and len(keep) >= max_samples:
+                    break
+        n_short = n_checked - len(keep)
+        if n_short > 0:
+            print(
+                f"[Code15Dataset] {n_short}/{n_checked} {split} records have fewer than "
+                f"{MIN_REAL_LEN} real samples; excluded."
+            )
+        df = df.iloc[keep]
 
         self.df = df.reset_index(drop=True)
         self.split = split
@@ -206,8 +248,8 @@ class Code15Dataset(Dataset):
         out = np.zeros(len(self.df), dtype=int)
         for i, eid in enumerate(self.df["exam_id"].values):
             file_idx, row = self._id_to_pos[int(eid)]
-            nz = np.flatnonzero(np.any(self._get_hdf5(file_idx)["tracings"][row] != 0, axis=1))
-            out[i] = nz[-1] - nz[0] + 1 if nz.size else 0
+            out[i] = _chunk_real_lengths(self.hdf5_paths[file_idx], row // _REAL_LEN_CHUNK)[
+                row % _REAL_LEN_CHUNK]
         return out
 
     def pos_weight(self) -> float:
