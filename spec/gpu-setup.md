@@ -1,241 +1,117 @@
-# GPU Training Setup
+# GPU pod setup (RunPod)
 
-Target platform: **RunPod** (Linux, CUDA 12.1).
-Estimated cost: ~$2/hr on RTX 3090 community GPU, ~$4/hr on A100.
+Reference for provisioning, environment and data. Updated 2026-10-11. The run-by-run launch
+flow, guardrails and termination rules are in `.claude/skills/experiment-facilitator/SKILL.md`;
+this file does not repeat them. Reproducing from a clean machine: `REPRODUCING.md`.
 
----
+## 1. What a pod needs
 
-## 1. Instance Setup
-
-Recommended pod template: **RunPod PyTorch 2.1** (includes CUDA 12.1, Python 3.11).
-
-If starting from a bare image or custom template, install CUDA drivers and verify:
-
-```bash
-nvidia-smi            # confirm GPU is visible, CUDA version
-python -c "import torch; print(torch.cuda.is_available())"
-```
-
----
-
-## 2. Install Dependencies
-
-```bash
-# Install uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
-source ~/.bashrc
-
-# Clone the repo
-git clone <your-repo-url>
-cd chagas-ecg-explainability
-
-# Install Python deps — pyproject.toml will pull torch>=2.3 on Linux
-uv sync
-
-# Verify the correct CUDA torch is installed
-uv run python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
-```
-
-If `torch.cuda.is_available()` returns `False`, `uv sync` installed the CPU wheel from PyPI (the lock file source). Re-install with the CUDA wheel matching your driver:
-
-```bash
-# Check your CUDA driver version first:
-nvidia-smi | grep "CUDA Version"
-
-# Install the matching wheel, e.g. for CUDA 12.4:
-uv add torch --index https://download.pytorch.org/whl/cu124
-```
-
-The locked torch version is **2.11.0** (Linux). Pick the `cuXXX` index that matches your driver — don't assume `cu121`.
-
----
-
-## 3. Upload Data
-
-The HDF5 and WFDB files must be present at `data/` before training.
-Three options (fastest to slowest):
-
-**Option A — RunPod volume mount (recommended)**
-Attach a network volume in the RunPod UI. Download the data once, reuse across pods.
-
-**Option B — direct download on pod**
-```bash
-mkdir -p data/code15
-cd data/code15
-curl -L "https://zenodo.org/records/4916206/files/exams_part0.zip?download=1" -o exams_part0.zip
-curl -L "https://moody-challenge.physionet.org/2025/data/code15_chagas_labels.zip" -o code15_chagas_labels.zip
-unzip exams_part0.zip && unzip code15_chagas_labels.zip
-```
-
-For the full 18-part CODE-15% dataset:
-```bash
-for i in $(seq 0 17); do
-  curl -L "https://zenodo.org/records/4916206/files/exams_part${i}.zip?download=1" -o exams_part${i}.zip
-  unzip exams_part${i}.zip && rm exams_part${i}.zip
-done
-```
-
-**Option C — rsync from local machine**
-```bash
-rsync -avz --progress data/ <runpod-user>@<pod-ip>:<pod-path>/data/
-```
-
----
-
-## 4. Run the Audit Before Training
-
-Always verify the data is healthy before any training run:
-
-```bash
-uv run python src/audit_preprocessing.py --n-samples 20
-```
-
-Expected: `PASS=43  FAIL=0  WARN=0  SKIP=0`.
-Any FAIL is a blocker — do not proceed.
-
----
-
-## 5. Training Command
-
-Three tiers — pick the one that matches your data and goal:
-
-| Tier | Data needed | Positives | Purpose |
-|---|---|---|---|
-| Smoke test | part0 only (already local) | 283 train | Verify CUDA path, ~2 min |
-| Part0 full run | part0 only (already local) | 283 train | Real training, no extra download |
-| Full dataset | All 18 parts (~67 GB) | ~4,600 train | Production-quality run |
-
----
-
-**Tier 2 — Part 0 only, full training run (no extra download needed):**
-
-```bash
-uv run python src/train.py \
-    --hdf5 data/code15/exams_part0.hdf5 \
-    --labels data/code15/code15_chagas_labels.csv \
-    --epochs 30 --batch-size 256 \
-    --accelerator gpu --devices 1 --num-workers 4 --amp \
-    --eval-test --wandb
-```
-
-This trains on 13,974 exams (283 positives). Expect ~45 sec/epoch on RTX 3090 → ~23 min total.
-Use this for initial GPU validation and hyperparameter tuning before committing to a full run.
-
----
-
-**Tier 3 — all 18 CODE-15% parts (recommended for real training):**
-
-```bash
-uv run python src/train.py \
-    --hdf5 data/code15/exams_part0.hdf5 \
-          data/code15/exams_part1.hdf5 \
-          data/code15/exams_part2.hdf5 \
-          data/code15/exams_part3.hdf5 \
-          data/code15/exams_part4.hdf5 \
-          data/code15/exams_part5.hdf5 \
-          data/code15/exams_part6.hdf5 \
-          data/code15/exams_part7.hdf5 \
-          data/code15/exams_part8.hdf5 \
-          data/code15/exams_part9.hdf5 \
-          data/code15/exams_part10.hdf5 \
-          data/code15/exams_part11.hdf5 \
-          data/code15/exams_part12.hdf5 \
-          data/code15/exams_part13.hdf5 \
-          data/code15/exams_part14.hdf5 \
-          data/code15/exams_part15.hdf5 \
-          data/code15/exams_part16.hdf5 \
-          data/code15/exams_part17.hdf5 \
-    --labels data/code15/code15_chagas_labels.csv \
-    --epochs 30 \
-    --batch-size 256 \
-    --lr 1e-3 \
-    --accelerator gpu \
-    --devices 1 \
-    --num-workers 4 \
-    --amp \
-    --eval-test \
-    --wandb
-```
-
-Or with shell glob expansion (bash/zsh):
-
-```bash
-uv run python src/train.py \
-    --hdf5 data/code15/exams_part*.hdf5 \
-    --labels data/code15/code15_chagas_labels.csv \
-    --epochs 30 --batch-size 256 \
-    --accelerator gpu --devices 1 --num-workers 4 --amp \
-    --eval-test --wandb
-```
-
-This trains on 343,424 exams with 6,561 positives (vs. 19,939 / 403 with part0 only).
-
-**Flag reference:**
-
-| Flag | Default | Purpose |
+| Item | Value | Source |
 |---|---|---|
-| `--accelerator gpu` | `auto` | Explicit GPU; required on RunPod |
-| `--devices 1` | 1 | Number of GPUs |
-| `--num-workers 4` | 0 | DataLoader workers; 0 is safe on Mac, 4–8 on Linux |
-| `--amp` | off | 16-bit mixed precision (~40% memory savings, ~30% speedup) |
-| `--eval-test` | off | Evaluate the held-out test split after training ends |
-| `--wandb` | off | Log metrics to W&B |
-| `--batch-size 256` | 64 | GPU allows larger batches than CPU prototype |
+| Datacenter | EU-RO-1 | `spec/runs/baseline.json` `infra` |
+| Network volume | `w6ahd2sms6`, mounted at `/workspace` (repo, data, venv and pinned uv persist on it) | same |
+| Template | `runpod-torch-v240` (`runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04`) | same |
+| Min driver CUDA | 12.4 (the locked torch is `2.6.0+cu124`) | `pyproject.toml`, `uv.lock` |
+| GPU order | RTX 4090, L4, RTX A6000, RTX 2000 Ada (first with stock) | manifest `gpu_preference_order` |
+| Excluded | Blackwell cards (need cu128) and AMD MI300X | manifest `gpu_id_note` |
 
-**Smoke test on GPU (verify CUDA path before a long run):**
+Create pods with `./scripts/create_pod.sh` (walks the order against live stock, forwards the
+RunPod and W&B keys into the pod env). Stock is live and low-stock listings are racy: re-check,
+never assume. Delete with `runpodctl pod delete <id>` (there is no `terminate`); confirm
+`runpodctl pod list` returns `[]`.
 
-```bash
-uv run python src/train.py \
-    --hdf5 data/code15/exams_part0.hdf5 \
-    --labels data/code15/code15_chagas_labels.csv \
-    --fast --epochs 2 --batch-size 64 \
-    --accelerator gpu --devices 1 --num-workers 4 --amp
-```
+Observed so far (2026-08-28 and 2026-10-10; different pipeline versions, so rates, not benchmarks):
 
-Expected: training starts within ~30s, GPU utilization visible in `nvidia-smi`.
+| GPU | Billed rate | Epoch time once the page cache is warm |
+|---|---|---|
+| RTX 4090 | $0.89/hr (2026-10-10; $0.74 on 2026-08-28; manifest lists $0.74) | ~2 min |
+| L4 | $0.49/hr | ~5 min |
 
----
+Epoch 0 is slower on a cold cache (about 3.8 it/s on the 4090). Spend is tracked by
+`python3 .claude/hooks/guard.py --ledger` against the $50 global budget.
 
-## 6. Checkpoint and Resume
-
-PyTorch Lightning saves checkpoints to `lightning_logs/version_N/checkpoints/`.
-The `ModelCheckpoint` callback keeps the best `val/auroc` checkpoint.
-
-To resume from a checkpoint:
+## 2. Environment (from the lock, never re-resolved on the pod)
 
 ```bash
-uv run python src/train.py \
-    --hdf5 data/code15/exams_part0.hdf5 \
-    --labels data/code15/code15_chagas_labels.csv \
-    --epochs 30 --batch-size 256 \
-    --accelerator gpu --devices 1 --num-workers 4 --amp
-# Add to trainer in train.py: trainer.fit(..., ckpt_path="path/to/checkpoint.ckpt")
+git pull                              # the commit the manifest's code_sha names must be pushed first
+bash scripts/setup_runpod.sh
 ```
 
-Download checkpoints from RunPod before terminating the pod:
+`setup_runpod.sh` installs the uv version named by `pyproject.toml` (`required-version`) into
+`/workspace/bin`, runs `uv sync --frozen`, checks `uv sync --frozen --check`, then
+`scripts/env_check.py --require-gpu`: torch CUDA vs driver CUDA, GPU visible, one AMP
+forward/backward of `ECGResNet`. It prints the environment as JSON.
+
+- Linux resolves `torch 2.6.0+cu124` from `https://download.pytorch.org/whl/cu124`
+  (`[tool.uv.sources]` in `pyproject.toml`). The Intel Mac resolves `torch 2.2.2` (CPU).
+- Numbers reported anywhere come only from the pod environment. The Mac is for smoke tests, the
+  length scan and analysis.
+- Do not `uv add`, `uv lock` or `uv pip install` on the pod. Changing the lock is a local change
+  that gets committed and pushed, and the manifest's `code_sha` moves with it.
+- Call `.venv/bin/python` directly (as `launch_run.py` does). `uv run` without `--frozen` can
+  re-resolve and resync the venv.
+- Before the lock existed the pod venv was hand-installed. That package list is recorded in
+  `runs/_env-pre-lock.json` once the setup session has run (see `notes/runs.md`).
+
+## 3. Data
 
 ```bash
-rsync -avz <pod-ip>:<pod-path>/lightning_logs/ ./lightning_logs/
+bash scripts/download_data.sh         # skips files already present, then verifies
+python3 scripts/data_manifest.py --verify            # full sha256 of every file, ~once per pod
+python3 scripts/data_manifest.py --verify --quick    # presence + size only
 ```
 
----
+| Input | Where | Size |
+|---|---|---|
+| CODE-15% parts 0-17 | `data/code15/exams_part{0..17}.hdf5` (Zenodo 4916206 v1.0.0) | part0 is 3.93 GB; ~63 GB for parts 1-17 (volume, 2026-08-28) |
+| Labels | `data/code15/code15_chagas_labels.csv` (PhysioNet Challenge 2025) | 7.1 MB |
+| Split universe | `data/code15/exams.csv`: training refuses to start without it | 35.5 MB |
+| SaMi-Trop | `data/samitrop/exams.hdf5`, `exams.csv` (Zenodo 4905618 v1.0.0) | 641 MB |
+| PTB-XL 1.0.3 | `data/ptbxl/`, files directly in that folder, checked against its own `SHA256SUMS.txt` | 3.2 GB |
 
-## 7. Mixed Precision Notes
+`spec/data-manifest.json` records path, size and sha256 for each file, plus the source URL and
+Zenodo's published md5 of the zip each HDF5 came from. PTB-XL rsync (port 873) is blocked on
+RunPod, so the script uses the HTTPS zip.
 
-`--amp` enables `precision="16-mixed"` (FP16 forward + backward, FP32 master weights).
-This is safe for this model: BatchNorm and the BCE loss are not precision-sensitive at this scale.
+## 4. Before launching a run
 
-- A100 also supports `bfloat16` (`precision="bf16-mixed"`) — numerically more stable than FP16, no overflow risk. Change the `precision` line in `train.py` if desired.
-- RTX 3090 has native FP16 Tensor Cores; BF16 is also supported but slower than on A100.
+1. `bash scripts/setup_runpod.sh` passes (or `.venv/bin/python scripts/env_check.py --require-gpu`
+   and `uv sync --frozen --check` on a pod that is already set up).
+2. `python3 scripts/data_manifest.py --verify` passes.
+3. `python3 scripts/launch_run.py <run> --manifest <manifest> --dry-run` passes its checks.
+4. Launch only through `launch_run.py` or `sweep_driver.sh`. A direct `src/train.py` call is
+   blocked by the hook; a local `--fast` smoke run is allowed.
+5. After the run: `python3 scripts/collect_run.py lightning_logs/<run>` writes the tracked
+   `runs/<run>/` (meta, env, parsed summary, val predictions, log without progress bars).
 
----
+Local smoke test (Mac, CPU, ~10 s; checks wiring, not results):
 
-## 8. Expected Training Time
+```bash
+uv run --frozen python src/train.py --hdf5 data/code15/exams_part0.hdf5 \
+    --labels data/code15/code15_chagas_labels.csv --fast --epochs 1
+```
 
-| Hardware | Batch size | AMP | Full part0 / epoch |
-|---|---|---|---|
-| Mac CPU (M1/M2) | 32–64 | off | ~20 min/epoch |
-| RTX 3090 | 256 | on | ~45 sec/epoch |
-| A100 40 GB | 512 | on | ~25 sec/epoch |
+## 5. `src/train.py` flags used by the manifests
 
-30 epochs at 45 sec = ~23 min total on RTX 3090.
+| Flag | Meaning |
+|---|---|
+| `--hdf5 <paths...>` | CODE-15% parts (the launcher expands a glob) |
+| `--labels`, `--samitrop`, `--ptbxl`, `--exams-csv` | label CSV and the extra sources |
+| `--epochs`, `--batch-size`, `--lr` | training length, batch, learning rate |
+| `--accelerator gpu --devices 1 --num-workers N` | N is 8 in the baseline manifest; 0 is safe on the Mac |
+| `--amp` | fp16 mixed precision |
+| `--eval-val` (alias `--eval-test`) | val-only report after training; the locked-final split is never read here |
+| `--wandb`, `--run-name` | W&B logging; the name namespaces the checkpoint dir and `val_preds.csv` |
+| `--fast` | tiny subset for smoke runs |
+
+## 6. Pod gotchas (observed)
+
+- `--env` variables reach PID 1 only; SSH sessions do not see them. Start the driver after
+  `P="$PATH"; . /etc/rp_environment; PATH="$P"` (gives `RUNPOD_*`, not `WANDB_API_KEY`).
+- W&B: the user runs `.venv/bin/wandb login` on each pod (`~/.netrc` is on container disk).
+- `runpodctl pod create --wait` echoes the env block including keys; pipe through `sed`.
+- RunPod injects SSH keys at pod creation only; a pod that lost access must be recreated.
+- SSH sessions drop mid-command: detach long work, recover state from the log.
+- No `rsync` on the pod image: pull with `scp`. Checkpoint paths contain a literal `val/`
+  directory (metric name `val/auroc`); use `find`, not a `*.ckpt` glob.
+- Stopped pods can fail to restart when host capacity shifts: delete rather than stop.
