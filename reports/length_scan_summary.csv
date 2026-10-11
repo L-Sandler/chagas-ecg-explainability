@@ -1,0 +1,134 @@
+scope,bin,n_records,n_labelled,n_chagas_pos,n_train,n_val,n_locked,n_unlabelled
+ALL,all-zero (real_len == 0),688,669,2,482,89,98,19
+ALL,1..27 (filtfilt raises),4,4,0,3,1,0,0
+ALL,28..2933 (shorter than crop),4395,4373,5,3048,657,668,22
+ALL,== 2934,201084,199591,5308,139808,30050,29733,1493
+ALL,2935..4095,8863,8795,7,6220,1336,1239,68
+ALL,== 4096 (no padding),130763,129992,261,91027,19469,19496,771
+ALL,any non-finite value,0,,,,,,
+exams_part0.hdf5,all-zero (real_len == 0),39,38,1,28,6,4,1
+exams_part0.hdf5,1..27 (filtfilt raises),0,0,0,0,0,0,0
+exams_part0.hdf5,28..2933 (shorter than crop),273,272,0,189,40,43,1
+exams_part0.hdf5,== 2934,11675,11624,323,8208,1718,1698,51
+exams_part0.hdf5,2935..4095,477,476,2,332,69,75,1
+exams_part0.hdf5,== 4096 (no padding),7537,7529,23,5255,1121,1153,8
+exams_part0.hdf5,any non-finite value,0,,,,,,
+exams_part1.hdf5,all-zero (real_len == 0),52,51,0,39,4,8,1
+exams_part1.hdf5,1..27 (filtfilt raises),0,0,0,0,0,0,0
+exams_part1.hdf5,28..2933 (shorter than crop),278,277,1,195,47,35,1
+exams_part1.hdf5,== 2934,11745,11711,338,8246,1741,1724,34
+exams_part1.hdf5,2935..4095,499,497,0,355,72,70,2
+exams_part1.hdf5,== 4096 (no padding),7427,7412,21,5196,1114,1102,15
+exams_part1.hdf5,any non-finite value,0,,,,,,
+exams_part2.hdf5,all-zero (real_len == 0),53,52,0,33,10,9,1
+exams_part2.hdf5,1..27 (filtfilt raises),0,0,0,0,0,0,0
+exams_part2.hdf5,28..2933 (shorter than crop),264,262,0,181,36,45,2
+exams_part2.hdf5,== 2934,11607,11576,329,8148,1708,1720,31
+exams_part2.hdf5,2935..4095,532,531,0,359,84,88,1
+exams_part2.hdf5,== 4096 (no padding),7545,7533,12,5325,1090,1118,12
+exams_part2.hdf5,any non-finite value,0,,,,,,
+exams_part3.hdf5,all-zero (real_len == 0),32,31,0,25,3,3,1
+exams_part3.hdf5,1..27 (filtfilt raises),0,0,0,0,0,0,0
+exams_part3.hdf5,28..2933 (shorter than crop),242,242,0,168,41,33,0
+exams_part3.hdf5,== 2934,11711,11675,343,8128,1838,1709,36
+exams_part3.hdf5,2935..4095,455,454,1,311,70,73,1
+exams_part3.hdf5,== 4096 (no padding),7561,7544,8,5247,1161,1136,17
+exams_part3.hdf5,any non-finite value,0,,,,,,
+exams_part4.hdf5,all-zero (real_len == 0),33,32,0,25,3,4,1
+exams_part4.hdf5,1..27 (filtfilt raises),0,0,0,0,0,0,0
+exams_part4.hdf5,28..2933 (shorter than crop),232,232,2,153,37,42,0
+exams_part4.hdf5,== 2934,11734,11701,324,8206,1789,1706,33
+exams_part4.hdf5,2935..4095,528,527,0,385,83,59,1
+exams_part4.hdf5,== 4096 (no padding),7474,7459,14,5234,1057,1168,15
+exams_part4.hdf5,any non-finite value,0,,,,,,
+exams_part5.hdf5,all-zero (real_len == 0),35,34,0,25,1,8,1
+exams_part5.hdf5,1..27 (filtfilt raises),0,0,0,0,0,0,0
+exams_part5.hdf5,28..2933 (shorter than crop),273,273,0,202,38,33,0
+exams_part5.hdf5,== 2934,11673,11632,311,8202,1661,1769,41
+exams_part5.hdf5,2935..4095,544,543,1,378,82,83,1
+exams_part5.hdf5,== 4096 (no padding),7476,7464,13,5200,1129,1135,12
+exams_part5.hdf5,any non-finite value,0,,,,,,
+exams_part6.hdf5,all-zero (real_len == 0),37,36,1,27,4,5,1
+exams_part6.hdf5,1..27 (filtfilt raises),0,0,0,0,0,0,0
+exams_part6.hdf5,28..2933 (shorter than crop),271,270,1,181,44,45,1
+exams_part6.hdf5,== 2934,11809,11771,331,8222,1831,1718,38
+exams_part6.hdf5,2935..4095,491,490,0,339,79,72,1
+exams_part6.hdf5,== 4096 (no padding),7393,7385,15,5196,1059,1130,8
+exams_part6.hdf5,any non-finite value,0,,,,,,
+exams_part7.hdf5,all-zero (real_len == 0),38,37,0,24,10,3,1
+exams_part7.hdf5,1..27 (filtfilt raises),1,1,0,0,1,0,0
+exams_part7.hdf5,28..2933 (shorter than crop),235,233,0,161,33,39,2
+exams_part7.hdf5,== 2934,11797,11763,299,8239,1777,1747,34
+exams_part7.hdf5,2935..4095,491,491,0,359,63,69,0
+exams_part7.hdf5,== 4096 (no padding),7439,7424,15,5171,1124,1129,15
+exams_part7.hdf5,any non-finite value,0,,,,,,
+exams_part8.hdf5,all-zero (real_len == 0),50,49,0,35,7,7,1
+exams_part8.hdf5,1..27 (filtfilt raises),0,0,0,0,0,0,0
+exams_part8.hdf5,28..2933 (shorter than crop),266,266,1,175,48,43,0
+exams_part8.hdf5,== 2934,11802,11752,313,8189,1800,1763,50
+exams_part8.hdf5,2935..4095,489,488,0,336,74,78,1
+exams_part8.hdf5,== 4096 (no padding),7394,7383,17,5099,1148,1136,11
+exams_part8.hdf5,any non-finite value,0,,,,,,
+exams_part9.hdf5,all-zero (real_len == 0),36,35,0,25,8,2,1
+exams_part9.hdf5,1..27 (filtfilt raises),1,1,0,1,0,0,0
+exams_part9.hdf5,28..2933 (shorter than crop),250,250,0,182,37,31,0
+exams_part9.hdf5,== 2934,11819,11780,321,8242,1750,1788,39
+exams_part9.hdf5,2935..4095,522,521,0,373,80,68,1
+exams_part9.hdf5,== 4096 (no padding),7373,7363,13,5207,1078,1078,10
+exams_part9.hdf5,any non-finite value,0,,,,,,
+exams_part10.hdf5,all-zero (real_len == 0),49,48,0,37,5,6,1
+exams_part10.hdf5,1..27 (filtfilt raises),0,0,0,0,0,0,0
+exams_part10.hdf5,28..2933 (shorter than crop),254,254,0,192,25,37,0
+exams_part10.hdf5,== 2934,11681,11647,280,8184,1719,1744,34
+exams_part10.hdf5,2935..4095,514,511,1,351,77,83,3
+exams_part10.hdf5,== 4096 (no padding),7503,7492,20,5212,1123,1157,11
+exams_part10.hdf5,any non-finite value,0,,,,,,
+exams_part11.hdf5,all-zero (real_len == 0),40,39,0,33,1,5,1
+exams_part11.hdf5,1..27 (filtfilt raises),0,0,0,0,0,0,0
+exams_part11.hdf5,28..2933 (shorter than crop),247,247,0,177,31,39,0
+exams_part11.hdf5,== 2934,11878,11840,302,8309,1856,1675,38
+exams_part11.hdf5,2935..4095,501,501,0,370,68,63,0
+exams_part11.hdf5,== 4096 (no padding),7335,7331,17,5073,1159,1099,4
+exams_part11.hdf5,any non-finite value,0,,,,,,
+exams_part12.hdf5,all-zero (real_len == 0),41,40,0,25,7,8,1
+exams_part12.hdf5,1..27 (filtfilt raises),1,1,0,1,0,0,0
+exams_part12.hdf5,28..2933 (shorter than crop),235,234,0,155,38,41,1
+exams_part12.hdf5,== 2934,11703,11658,322,8162,1783,1713,45
+exams_part12.hdf5,2935..4095,499,498,0,360,72,66,1
+exams_part12.hdf5,== 4096 (no padding),7522,7513,15,5255,1132,1126,9
+exams_part12.hdf5,any non-finite value,0,,,,,,
+exams_part13.hdf5,all-zero (real_len == 0),42,41,0,33,4,4,1
+exams_part13.hdf5,1..27 (filtfilt raises),0,0,0,0,0,0,0
+exams_part13.hdf5,28..2933 (shorter than crop),280,278,0,190,45,43,2
+exams_part13.hdf5,== 2934,11782,11744,300,8241,1760,1743,38
+exams_part13.hdf5,2935..4095,491,491,0,342,78,71,0
+exams_part13.hdf5,== 4096 (no padding),7406,7399,11,5103,1156,1140,7
+exams_part13.hdf5,any non-finite value,0,,,,,,
+exams_part14.hdf5,all-zero (real_len == 0),37,36,0,26,3,7,1
+exams_part14.hdf5,1..27 (filtfilt raises),0,0,0,0,0,0,0
+exams_part14.hdf5,28..2933 (shorter than crop),244,243,0,182,30,31,1
+exams_part14.hdf5,== 2934,11744,11703,330,8201,1764,1738,41
+exams_part14.hdf5,2935..4095,497,496,1,355,75,66,1
+exams_part14.hdf5,== 4096 (no padding),7479,7460,15,5253,1131,1076,19
+exams_part14.hdf5,any non-finite value,0,,,,,,
+exams_part15.hdf5,all-zero (real_len == 0),39,38,0,24,5,9,1
+exams_part15.hdf5,1..27 (filtfilt raises),1,1,0,1,0,0,0
+exams_part15.hdf5,28..2933 (shorter than crop),261,260,0,179,40,41,1
+exams_part15.hdf5,== 2934,11154,11126,248,7729,1682,1715,28
+exams_part15.hdf5,2935..4095,575,574,1,410,92,72,1
+exams_part15.hdf5,== 4096 (no padding),7971,7957,16,5634,1200,1123,14
+exams_part15.hdf5,any non-finite value,0,,,,,,
+exams_part16.hdf5,all-zero (real_len == 0),26,24,0,14,5,5,2
+exams_part16.hdf5,1..27 (filtfilt raises),0,0,0,0,0,0,0
+exams_part16.hdf5,28..2933 (shorter than crop),232,223,0,150,36,37,9
+exams_part16.hdf5,== 2934,10578,9995,217,6943,1456,1596,583
+exams_part16.hdf5,2935..4095,618,585,0,416,100,69,33
+exams_part16.hdf5,== 4096 (no padding),8547,8153,13,5815,1178,1160,394
+exams_part16.hdf5,any non-finite value,0,,,,,,
+exams_part17.hdf5,all-zero (real_len == 0),9,8,0,4,3,1,1
+exams_part17.hdf5,1..27 (filtfilt raises),0,0,0,0,0,0,0
+exams_part17.hdf5,28..2933 (shorter than crop),58,57,0,36,11,10,1
+exams_part17.hdf5,== 2934,3192,2893,77,2009,417,467,299
+exams_part17.hdf5,2935..4095,140,121,0,89,18,14,19
+exams_part17.hdf5,== 4096 (no padding),2381,2191,3,1552,309,330,190
+exams_part17.hdf5,any non-finite value,0,,,,,,
