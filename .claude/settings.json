@@ -6,7 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\""
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\"",
+            "onFailure": "block"
           }
         ]
       }
@@ -31,24 +32,63 @@
       "Bash(runpodctl pod get *)",
       "Bash(runpodctl pod list*)",
       "Bash(runpodctl gpu list*)",
-      "Bash(ssh root@*)",
+      "Bash(ssh *root@*)",
       "Bash(scp *)"
     ],
     "deny": [
-      "Write(.guardrails/**)",
-      "Edit(.guardrails/**)",
-      "Write(.claude/**)",
-      "Edit(.claude/**)",
-      "Write(spec/runs/**)",
-      "Edit(spec/runs/**)",
-      "Write(scripts/launch_run.py)",
-      "Edit(scripts/launch_run.py)",
-      "Write(scripts/sweep_driver.sh)",
-      "Edit(scripts/sweep_driver.sh)",
-      "Write(spec/experiment-facilitator-prompt.md)",
-      "Edit(spec/experiment-facilitator-prompt.md)",
-      "Write(CLAUDE.md)",
-      "Edit(CLAUDE.md)"
+      "Edit(/.guardrails/**)",
+      "Edit(/.claude/**)",
+      "Edit(/spec/runs/**)",
+      "Edit(/scripts/launch_run.py)",
+      "Edit(/scripts/sweep_driver.sh)",
+      "Edit(/CLAUDE.md)",
+      "Edit(/README.md)"
     ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "allowUnsandboxedCommands": false,
+    "failIfUnavailable": true,
+    "excludedCommands": [
+      "ssh *",
+      "scp *",
+      "runpodctl *",
+      "./scripts/create_pod.sh *",
+      "git push *",
+      "git pull *",
+      "git fetch *"
+    ],
+    "filesystem": {
+      "allowWrite": [
+        "~/.cache/uv",
+        "~/.local/share/uv"
+      ],
+      "denyWrite": [
+        "./.guardrails",
+        "./.claude",
+        "./spec/runs",
+        "./notes/decisions",
+        "./scripts/launch_run.py",
+        "./scripts/sweep_driver.sh",
+        "./CLAUDE.md",
+        "./README.md",
+        "./src/preprocess.py",
+        "./src/dataset.py",
+        "./src/model.py",
+        "./src/train.py",
+        "./src/explain.py"
+      ]
+    },
+    "network": {
+      "allowedDomains": [
+        "pypi.org",
+        "files.pythonhosted.org",
+        "download.pytorch.org",
+        "api.wandb.ai",
+        "github.com",
+        "zenodo.org",
+        "physionet.org"
+      ]
+    }
   }
 }

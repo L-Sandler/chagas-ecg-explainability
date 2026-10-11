@@ -1,33 +1,20 @@
 # Claude Code Guidelines
 
-## SSH into RunPod pods
+## Output style
 
-When connecting to a RunPod pod via SSH, apply the following discipline:
+- Lead with the answer or the decision needed. Default to under ~15 lines.
+- Plans: goal, steps, how to verify. One table at most; no per-item rationale unless asked.
+- Don't restate the request or recap tool output.
+- Ask at most 3 questions at a time, each with a recommended default.
+- Offer detail on request instead of including it.
 
-**Auto-proceed (no confirmation needed):**
-- Read-only commands: `ls`, `du`, `df`, `ps aux`, `date`, `nvidia-smi`, `cat`, `tail`, `head`, `wc`, status/progress checks
+## Pod and training sessions
 
-**Always confirm before running:**
-- Commands that write, install, or delete: `apt-get`, `curl`, `wget`, `unzip`, `rm`, `mv`, `cp` (to new locations)
-- Commands that modify the repo or environment: `git`, `uv`, `pip`
-- Killing or stopping processes: `kill`, `pkill`
-- Long-running training commands (`uv run python src/train.py ...`)
-
-**Never run without explicit instruction:**
-- `rm -rf` on any path
-- Force-push or branch deletion
-- Pod termination or reboot
-- Any command that could destroy training checkpoints or downloaded data
-
-**General principle:** On a cloud GPU pod, mistakes are expensive (data re-download, lost checkpoints, wasted GPU time). When in doubt, show the command and ask first.
-
-## Facilitator sessions (training-run execution)
-
-When the task is running training experiments, read `spec/experiment-facilitator-prompt.md`
-first. The role there is execution + faithful recording only; model/hyperparameter choices
-and interpretation stay with the user. Runs come from `spec/runs/*.json`, launch via
-`scripts/launch_run.py`, and the PreToolUse hook in `.claude/hooks/guard.py` gates risky
-actions behind `.guardrails/approve-*` files that only the user creates.
+Read `.claude/skills/experiment-facilitator/SKILL.md` first. Role: execution and faithful
+recording only. Runs come from `spec/runs/*.json`, launch via `scripts/launch_run.py`, and
+`.claude/hooks/guard.py` gates risky actions behind `.guardrails/` files only the user creates.
+On a pod, read-only commands run freely; anything that writes, installs, kills or touches
+git needs confirmation first.
 
 ## Working agreement (research authorship)
 
