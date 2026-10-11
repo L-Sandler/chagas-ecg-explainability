@@ -1,0 +1,96 @@
+{
+  "datasets": {
+    "code15": {
+      "doi": "10.5281/zenodo.4916206",
+      "name": "CODE-15%",
+      "url": "https://zenodo.org/records/4916206",
+      "version": "1.0.0"
+    },
+    "code15_labels": {
+      "doi": null,
+      "name": "CODE-15% Chagas labels (PhysioNet/CinC Challenge 2025)",
+      "url": "https://moody-challenge.physionet.org/2025/data/code15_chagas_labels.zip",
+      "version": null
+    },
+    "ptbxl": {
+      "doi": "10.13026/kfzx-aw45",
+      "name": "PTB-XL",
+      "url": "https://physionet.org/content/ptb-xl/1.0.3/",
+      "version": "1.0.3"
+    },
+    "samitrop": {
+      "doi": "10.5281/zenodo.4905618",
+      "name": "SaMi-Trop",
+      "url": "https://zenodo.org/records/4905618",
+      "version": "1.0.0"
+    }
+  },
+  "files": {
+    "data/code15/code15_chagas_labels.csv": {
+      "dataset": "code15_labels",
+      "note": "extracted from code15_chagas_labels.zip; no published checksum",
+      "required": true,
+      "sha256": "a9919ea2c49fab3024dabe3f2746aab0c6d535beb69007d86ab8f32775e374df",
+      "size": 7142458,
+      "source_url": "https://moody-challenge.physionet.org/2025/data/code15_chagas_labels.zip"
+    },
+    "data/code15/code15_chagas_labels.zip": {
+      "dataset": "code15_labels",
+      "required": false,
+      "sha256": "9547e7b76580a9f5ef465c76cc2fad5d5c581b676d4fc2f969b399bd572fc014",
+      "size": 2637378,
+      "source_url": "https://moody-challenge.physionet.org/2025/data/code15_chagas_labels.zip"
+    },
+    "data/code15/exams.csv": {
+      "dataset": "code15",
+      "md5": "0107516d3f63864498fb77d15799cc95",
+      "md5_matches_published": true,
+      "published_md5": "0107516d3f63864498fb77d15799cc95",
+      "published_size": 35500900,
+      "required": true,
+      "sha256": "f9f82f4c07c1793e2285915c69f1113f5a7db8a0f2cf2f4b90474502f406bc35",
+      "size": 35500900,
+      "source_url": "https://zenodo.org/records/4916206/files/exams.csv"
+    },
+    "data/code15/exams_part0.hdf5": {
+      "dataset": "code15",
+      "published_zip_md5": "2bed0dc753d16beef8c2f7627e2b6ea4",
+      "published_zip_size": 2672786404,
+      "required": true,
+      "sha256": "37d071011436e78ac8881d0c8f70ad291def90b6b17b344eb51c1d697f7492cd",
+      "size": 3932518664,
+      "source_url": "https://zenodo.org/records/4916206/files/exams_part0.zip"
+    },
+    "data/samitrop/exams.csv": {
+      "dataset": "samitrop",
+      "md5": "6c9007a0427f7c3d9e1b6fb091231a67",
+      "md5_matches_published": true,
+      "published_md5": "6c9007a0427f7c3d9e1b6fb091231a67",
+      "published_size": 87713,
+      "required": true,
+      "sha256": "70de270a9f1d2fffe7407635798a27c27a4e22969b382331fa9bd30513fdcfdc",
+      "size": 87713,
+      "source_url": "https://zenodo.org/records/4905618/files/exams.csv"
+    },
+    "data/samitrop/exams.hdf5": {
+      "dataset": "samitrop",
+      "published_zip_md5": "a7b65f115b0222ad2ecbc6a422496fdd",
+      "published_zip_size": 264538267,
+      "required": true,
+      "sha256": "3ea104161e8d7b5d3e3cd5a02faa86e2a7a674b7b55f5f8d0329cb3c9fa2deca",
+      "size": 641337344,
+      "source_url": "https://zenodo.org/records/4905618/files/exams.zip"
+    }
+  },
+  "ptbxl": {
+    "dataset": "ptbxl",
+    "n_files": 87203,
+    "note": "every listed file is checked against the dataset's own SHA256SUMS.txt by --verify",
+    "root": "data/ptbxl",
+    "source_url": "https://physionet.org/content/ptb-xl/1.0.3/",
+    "sums_file": "SHA256SUMS.txt",
+    "sums_file_sha256": "b7224b92b341511ec3ceb13dc6652079b2c36a06504bcb49506f157f51dc695d"
+  },
+  "schema_version": 1,
+  "zenodo_checksums_retrieved": "2026-10-11"
+}

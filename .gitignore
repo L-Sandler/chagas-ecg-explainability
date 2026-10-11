@@ -17,7 +17,11 @@ lightning_checkpoints/
 
 # Generated report data — large per-record scan CSVs and rendered figures.
 # quality_summary.csv is intentionally kept (small, human-readable).
+# The length-scan summary and flagged list are tracked: they are the evidence behind the
+# short-record decision (the per-record scan, ~27 MB for all 18 parts, stays out).
 reports/*_scan*.csv
+!reports/length_scan_summary.csv
+!reports/length_scan_flagged.csv
 reports/figures/
 
 # Versioned guardrail config (overrides the .claude/* ignore above)
