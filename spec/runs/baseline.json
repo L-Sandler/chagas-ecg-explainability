@@ -1,7 +1,7 @@
 {
   "sweep": "baseline-crop2934",
   "owner_note": "User-owned. Infra copied from lr-sweep.json as a starting point. common_args, runs, cap_usd and code_sha are YOUR design decisions; this template has no planned runs and a code_sha that fails the launcher's pin check until you set it.",
-  "code_sha": "774ec79",
+  "code_sha": "72b93fc",
   "code_paths_pinned": [
     "src/",
     "pyproject.toml",
