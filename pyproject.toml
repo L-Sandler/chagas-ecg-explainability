@@ -9,10 +9,11 @@ dependencies = [
     "neurokit2>=0.2",
     "scipy>=1.13",
     # Deep learning
-    # Intel Mac (x86_64) is stuck at 2.2.2 — torch>=2.3 dropped that platform.
-    # On RunPod (Linux + CUDA 12.1): uv pip install torch --index-url https://download.pytorch.org/whl/cu121
+    # Intel Mac (x86_64) is stuck at 2.2.2 (CPU; torch>=2.3 dropped that platform): smoke tests,
+    # scans and analysis only. Linux pod: 2.6.0+cu124 from the pytorch-cu124 index below; reported
+    # numbers come only from that environment.
     "torch==2.2.2; sys_platform == 'darwin' and platform_machine == 'x86_64'",
-    "torch>=2.3; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "torch==2.6.0; sys_platform == 'linux'",
     "pytorch-lightning>=2.3",
     # Explainability
     "captum>=0.7",
@@ -28,11 +29,24 @@ dependencies = [
 ]
 
 [tool.uv]
+# Pin uv itself so the lock resolves the same way on the Mac and on the pod.
+required-version = "==0.11.7"
+# The lock covers only the two machines this project runs on.
+environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'darwin' and platform_machine == 'x86_64'",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu124", marker = "sys_platform == 'linux'" }]
 
 [dependency-groups]
 dev = [
     "ipykernel>=7.2.0",
     "jupyter>=1.1.1",
 ]
-# On RunPod (Linux + CUDA), override torch source:
-# uv add torch --index https://download.pytorch.org/whl/cu121
