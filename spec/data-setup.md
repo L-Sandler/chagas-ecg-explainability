@@ -29,24 +29,17 @@ uv run python src/preprocess.py
 
 **Always use `uv run python`** (not bare `python`) so an active conda env can't shadow the project venv.
 
-**Intel Mac note:** `torch==2.2.2` is pinned locally (last x86_64 build). On RunPod (Linux + CUDA), replace with: `uv add torch --index https://download.pytorch.org/whl/cu121`
+**Torch:** the lock resolves `torch 2.2.2` (CPU) on the Intel Mac and `2.6.0+cu124` on Linux via `[tool.uv.sources]`. Do not `uv add` on a pod; see `spec/gpu-setup.md` §2.
 
 ---
 
-## Local data inventory (as of 2026-05-15)
+## Data inventory
 
-| Path | Size | Status |
-|---|---|---|
-| `data/code15/exams_part0.hdf5` | 3.7 GB | ✅ Downloaded — sufficient for local prototyping |
-| `data/code15/exams_part1–17.hdf5` | ~63 GB total | ❌ Not downloaded — get on RunPod for full training |
-| `data/code15/code15_chagas_labels.csv` | 6.8 MB | ✅ Downloaded (covers all 18 parts) |
-| `data/code15/exams.csv` | 34 MB | ✅ Downloaded (Zenodo metadata, not used by training) |
-| `data/code15/wfdb/` | 1.6 GB | ✅ Downloaded — 19,901 WFDB records converted from part0. Not used by current training code (HDF5 path only). |
-| `data/samitrop/exams.hdf5` | 612 MB | ✅ Complete (1,631 records) |
-| `data/samitrop/exams.csv` | 86 KB | ✅ Downloaded |
-| `data/ptbxl/` | 3.2 GB | ✅ Complete (21,799 recordings × 2 resolutions) |
+Paths, sizes and sha256 of every file are in `spec/data-manifest.json`. Download and verify with
+`scripts/download_data.sh` and `scripts/data_manifest.py --verify` (`spec/gpu-setup.md` §3). Local
+machines may hold only part0 for smoke tests; training uses all 18 parts.
 
-**Why only part0 locally:** All 18 CODE-15% parts are ~67 GB. Part0 alone gives 403 positives (6% of total 6,561) — enough to verify the full pipeline. Download the remaining 17 parts on RunPod when ready for a production training run (see `spec/gpu-setup.md`).
+`data/code15/wfdb/` (part0 converted to WFDB) is optional and not used by the training code, which reads HDF5.
 
 ---
 
@@ -71,10 +64,10 @@ mkdir -p data/code15 data/ptbxl data/samitrop
 
 - **Primary source:** https://zenodo.org/records/4916206
 - **Full dataset:** 345,779 exams from 233,770 patients, 18 HDF5 parts
-- **For local prototyping use part0 only:** 20,001 records, ~3.7 GB unzipped
+- **part0:** 20,001 records; the other parts are listed in `spec/data-manifest.json`
 - **Format:** HDF5; keys `[exam_id, tracings]`; tracings shape `(N, 4096, 12)` float32
 - **Sampling:** 400 Hz
-- **Recording length:** 10s (4000 samples) OR 7s (2800 samples), zero-padded to 4096 per record (variable length is verified empirically; `prepare_code15_data.py:188` strips this padding before WFDB conversion)
+- **Recording length:** every record is stored as 4096 rows. Short (7 s) recordings hold 2,934 real samples with ~581 zero rows on each side; long (10 s) recordings fill all 4096 rows. Measured 2026-10-28 on every 20th part0 record (1,000 records): 2,934 real samples in 608, 4,096 in 364, 28 other lengths including 2 all-zero. `prepare_code15_data.py:188` strips the padding before WFDB conversion
 - **Lead order in HDF5:** `[I, II, III, AVR, AVL, AVF, V1, V2, V3, V4, V5, V6]` (Zenodo page calls Lead I "DI", Lead II "DII", Lead III "DIII"; the official conversion script `prepare_code15_data.py:139` uses the I/II/III spellings)
 - **Units:** mV, asserted at `prepare_code15_data.py:141` (Zenodo page does not specify)
 - **Chagas labels:** separate CSV (`exam_id, patient_id, chagas`) downloaded from the PhysioNet 2025 Challenge mirror
@@ -96,7 +89,7 @@ for i in $(seq 0 17); do
 done
 ```
 
-**Known issue — silent label drop:** 62 of 20,001 part0 records have no entry in the labels CSV and are silently filtered out by `Code15Dataset.__init__` (see backlog).
+**Known issue — records without a label:** 62 of 20,001 part0 records have no entry in the labels CSV. `Code15Dataset.__init__` excludes them and prints the count (`[Code15Dataset] N/M HDF5 records had no label row; excluded.`). Records with fewer than 28 real samples are also excluded (`notes/decisions/0008-min-real-length-28.md`).
 
 ---
 
@@ -162,28 +155,27 @@ After any download or update, run:
 uv run python src/audit_preprocessing.py
 ```
 
-Expected on a healthy setup:
-- `PASS` on every schema, count, units, bandpass, normalization, determinism, and step-C check
-- `WARN` only on the four known issues:
-  1. CODE-15% has 7s recordings whose zero-padding survives preprocessing
-  2. SaMi-Trop has 7s recordings (same story)
-  3. SaMi-Trop CSV has no chagas column (implicit positive)
-  4. CODE-15% has 62 part0 records with no chagas label (silently dropped today)
-  5. PTB-XL `RECORDS` has the missing-newline quirk above
+Expect `PASS` on every schema, count, units, bandpass, normalization and determinism check. `WARN`s
+are data-dependent (padded 7 s recordings, SaMi-Trop with no chagas column, part0 records with no
+label, flat leads, the PTB-XL `RECORDS` quirk above): read each one against the known issues in this
+file. Anything else FAIL or WARN means something has changed upstream.
 
-Anything else FAIL or WARN means something has changed upstream and the audit + this doc need updating before training.
+> The audit's padding checks still assume a 4,000-sample window (written before
+> `notes/decisions/0006-crop-to-common-length.md`). Treat their wording as stale until the script is revisited.
 
 ---
 
 ## Preprocessing contract (what every dataset becomes)
 
-`preprocess_signal()` in `src/preprocess.py` is the single shared entry point. All three datasets must produce the same downstream tensor:
+`preprocess_signal()` in `src/preprocess.py` is the single shared entry point. Rationale for each step is in `notes/decisions/`. All three datasets produce the same downstream tensor:
 
-- shape `(12, 4000)` float32
+- shape `(12, TARGET_LEN)` float32, `TARGET_LEN = 2934` (0006); constants live in `src/preprocess.py`
 - canonical lead order: `[I, II, III, AVR, AVL, AVF, V1, V2, V3, V4, V5, V6]`
-- bandpass [0.5, 40] Hz (4th-order Butterworth, applied via `filtfilt` → 8th-order magnitude response)
-- resample to 400 Hz if needed (PTB-XL is 500 Hz, others are already 400 Hz)
-- per-lead z-score (after a ±5 mV clip)
-- deterministic (verified)
+- zero-padding stripped at both ends of the recording (0001), then cropped to the first 2,934 samples at native fs, before the bandpass (0006); shorter records are zero-padded afterwards
+- bandpass [0.5, 40] Hz (4th-order Butterworth, applied via `filtfilt`)
+- resample to 400 Hz if needed (PTB-XL is 500 Hz, others are 400 Hz)
+- per-lead z-score after a ±5 mV clip
+- CODE-15% records with fewer than 28 real samples are excluded (0008)
+- deterministic
 
-The audit script enforces every property above on real samples from each dataset and on a synthetic frequency-response test. PTB-XL signals at 500 Hz get resampled to 400 Hz inside `preprocess_signal`; CODE-15% and SaMi-Trop are passed `fs=400` directly.
+`src/audit_preprocessing.py` checks these properties on real samples and on a synthetic frequency-response test.

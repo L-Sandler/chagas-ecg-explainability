@@ -4,8 +4,7 @@ Print verified descriptive statistics for all three ECG datasets.
 Usage:
     uv run python src/dataset_stats.py
 
-Output matches the numbers in spec/dataset-stats.md. Run this script to
-regenerate those numbers if the data files change.
+Run this script to regenerate the numbers if the data files change.
 """
 
 import os

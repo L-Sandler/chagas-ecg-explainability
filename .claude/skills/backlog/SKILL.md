@@ -29,6 +29,7 @@ Items here are captured quickly during focused work. Triage regularly to keep th
 ```
 
 Each item follows this format (one item = one block):
+
 ```markdown
 - [ ] **[CATEGORY]** Description of the item
   - _Added: YYYY-MM-DD | Context: brief note on what triggered this_
@@ -43,7 +44,9 @@ Categories: `IMPROVEMENT`, `TECH-DEBT`, `FEATURE`, `BUG`, `QUESTION`, `RESEARCH`
 When the user wants to log something quickly:
 
 ### Step 1: Extract the item
+
 Parse the user's message to identify:
+
 - What the item is (the actionable thing to do or investigate)
 - The category (infer from context if not stated)
 - The context (what file, function, or situation triggered this)
@@ -51,10 +54,13 @@ Parse the user's message to identify:
 If ambiguous, ask ONE clarifying question max. Don't ask about priority — that's for triage.
 
 ### Step 2: Write the item
+
 Append to `backlog.md` using the Read + Edit tools. Do NOT rewrite the whole file.
 
 ### Step 3: Confirm and redirect
+
 Reply with exactly:
+
 ```
 Logged: [one-line summary of the item]
 Back to [what you were doing].
@@ -64,6 +70,7 @@ Then immediately continue whatever work was in progress. Do not ask follow-up qu
 Do not discuss the item further unless the user brings it up.
 
 **Anti-patterns to avoid during capture:**
+
 - Do not start implementing the improvement
 - Do not rate or prioritize it
 - Do not expand on why it's a good idea
@@ -77,17 +84,21 @@ Do not discuss the item further unless the user brings it up.
 When the user asks to review the backlog (not during active implementation work):
 
 ### Step 1: Read the current backlog
+
 Read `backlog.md` and present the open items (unchecked `- [ ]`) grouped by category.
 Show the count per category.
 
 ### Step 2: Walk through items together
+
 For each item (or a batch the user wants to focus on), ask:
+
 - **Act now?** → help scope the work and start it
 - **Keep for later?** → leave as-is, optionally add a note
 - **Drop?** → mark as dropped with a brief reason: `~~item~~ — dropped: reason`
-- **Defer to spec?** → if it's a real architectural decision, help the user add it to `spec/spec.md` and remove from backlog
+- **Real design decision?** → it is the user's to make: point them to notes/decisions/ (see TEMPLATE.md) and remove it from backlog once a record exists.
 
 ### Step 3: After triage
+
 - Mark completed items with `[x]`
 - Update the file
 - Summarize: "X items cleared, Y kept, Z remain open."

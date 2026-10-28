@@ -16,7 +16,7 @@
 
 **Key distinction made:** Heavy breathing causes two separate artifacts through two different mechanisms: mechanical chest movement → baseline wander (low frequency, <0.5 Hz); respiratory muscle contraction → EMG noise (high frequency, >40 Hz). The bandpass filter handles both ends simultaneously.
 
-**Open question raised:** Whether the 40 Hz upper cutoff discards diagnostically relevant signal. Accepted as convention for now — Chagas-relevant features (RBBB, conduction delays) live well within 0–40 Hz. Logged in [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md).
+**Open question raised:** Whether the 40 Hz upper cutoff discards diagnostically relevant signal. Accepted as convention for now — Chagas-relevant features (RBBB, conduction delays) live well within 0–40 Hz. Logged in [open-questions.md](open-questions.md).
 
 **Done signal status:** Complete — `preprocess_ecg` implemented in `src/preprocess.py`. Verified visually with `src/plot_preprocess.py` on a CODE-15% record. Output is `[12, 4000]` float32, z-scored per lead, baseline flat.
 

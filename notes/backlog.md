@@ -2,9 +2,10 @@
 
 Items here are captured quickly during focused work. Triage regularly to keep this actionable.
 
-> **Active plan:** see [spec/next-session-plan.md](../spec/next-session-plan.md) for the sequenced
-> Phase 1 → 2 → 3 implementation plan (hardening → explainability → scale-up). The items below
-> tagged **[P1]/[P2]/[P3]** map to that plan's phases.
+> **Retired plan:** the [P1]/[P2]/[P3] tags below refer to the July `spec/next-session-plan.md`
+> (hardening → explainability → scale-up), deleted in the 2026-10 cleanup. Recover it with
+> `git show 906fa65:spec/next-session-plan.md`. The current-state record is `notes/decisions/`
+> and `notes/runs.md`.
 
 ---
 
@@ -111,8 +112,8 @@ Items here are captured quickly during focused work. Triage regularly to keep th
 - [ ] **[IMPROVEMENT]** Typeset the paper in LaTeX (arXiv single-column)
   - _Added: 2026-10-10 | Deferred; paper starts as `paper/draft.md`. Plan: `paper/main.tex` (article, 11pt, natbib/plainnat) with one file per section, `refs.bib`, figures exported as PDF. Build with tectonic via the VSCode LaTeX Workshop extension (already installed). Convert once the draft is stable or a venue is picked._
 
-- [ ] **[TECH-DEBT]** Consolidate project markdown that predates the 2026-10 fixes
-  - _Added: 2026-10-10 | Last-touched dates (git): `spec/spec.md` and `.claude/skills/*.md` Apr 22; `notes/learning/*` Apr 22-23; `spec/data-setup.md`, `spec/dataset-stats.md` May 15; `spec/gpu-setup.md` Jun 12; `spec/next-session-plan.md` Jul 21; `spec/fable-experiment-facilitator-prompt.md` Sep 11 (still describes the $15 wallet, the lr-sweep, and the Aug checkpoints as current). Several still mention the 4000-sample input, the part0-only split or "test set". Per CLAUDE.md the AI-written ones are not source material for the paper. Work: per file decide keep / update / archive / delete; the current-state record is `notes/decisions/`, `notes/runs.md`, `notes/backlog.md`. Protected files (facilitator prompt, CLAUDE.md, root README) are edited by the user._
+- [x] **[TECH-DEBT]** Consolidate project markdown that predates the 2026-10 fixes
+  - _Added: 2026-10-10 | Last-touched dates (git): `spec/spec.md` and `.claude/skills/*.md` Apr 22; `notes/learning/*` Apr 22-23; `spec/data-setup.md`, `spec/dataset-stats.md` May 15; `spec/gpu-setup.md` Jun 12; `spec/next-session-plan.md` Jul 21; `spec/fable-experiment-facilitator-prompt.md` Sep 11 (still describes the $15 wallet, the lr-sweep, and the Aug checkpoints as current). Several still mention the 4000-sample input, the part0-only split or "test set". Per CLAUDE.md the AI-written ones are not source material for the paper. Work: per file decide keep / update / archive / delete; the current-state record is `notes/decisions/`, `notes/runs.md`, `notes/backlog.md`. Protected files (facilitator prompt, CLAUDE.md, root README) are edited by the user. **Done 2026-10-28:** deleted `spec/spec.md`, `spec/next-session-plan.md`, `spec/dataset-stats.md`, `notes/learning/learning-plan.md` (recover with `git show 906fa65:<path>`); updated `spec/data-setup.md`; kept `spec/gpu-setup.md`, `learning-log.md`, `open-questions.md`._
 
 - [ ] **[TECH-DEBT]** Redesign the guardrail hook so behaviour matches its stated intent
   - _Added: 2026-10-10 | User's assessment: the guardrails do not do what they were designed to do. To be scoped in its own session (plan mode). Seed observations from 2026-10-10, not an audit: (1) a shell command was blocked only because its text mentioned a guarded path while writing to an unguarded file (matching is on command text, not target); (2) `git add`/`git commit` of `spec/runs/` passes while `cp`/`sed -i` to it is blocked; (3) the code gate is per file (`applies_to`), not per change, and a script that writes a gated file from inside Python is not seen; (4) approvals are a stale mix: `approve-lr-sweep` (Sep 11, empty, past its 8 h TTL) and a `budget.json` global cap of $50 against a real balance of $25.87; (5) the facilitator prompt and `.guardrails/README.md` describe different states of the project. Before redesign: write down, per rule, the failure it is meant to prevent._
