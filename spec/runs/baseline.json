@@ -8,8 +8,8 @@
     "uv.lock"
   ],
   "budget": {
-    "cap_usd": 3,
-    "max_pod_hours": 2,
+    "cap_usd": 4,
+    "max_pod_hours": 3,
     "max_concurrent_pods": 1,
     "approval_ttl_hours": 8,
     "gpu_price_usd_per_hr": {
@@ -41,10 +41,6 @@
     "data/code15/exams_part*.hdf5",
     "--labels",
     "data/code15/code15_chagas_labels.csv",
-    "--samitrop",
-    "data/samitrop/exams.hdf5",
-    "--ptbxl",
-    "data/ptbxl",
     "--epochs",
     "10",
     "--batch-size",
@@ -62,12 +58,38 @@
   "runs": [
     {
       "name": "baseline-crop2934",
+      "status": "crashed",
+      "args": [
+        "--lr",
+        "1e-3",
+        "--samitrop",
+        "data/samitrop/exams.hdf5",
+        "--ptbxl",
+        "data/ptbxl"
+      ],
+      "note": "Crashed 2026-10-10 (length-27 records, fixed by 0008). Relaunched as baseline-all-sources."
+    },
+    {
+      "name": "baseline-all-sources",
+      "status": "planned",
+      "args": [
+        "--lr",
+        "1e-3",
+        "--samitrop",
+        "data/samitrop/exams.hdf5",
+        "--ptbxl",
+        "data/ptbxl"
+      ],
+      "note": "First run on the fixed pipeline: decisions 0001, 0002, 0004-0008."
+    },
+    {
+      "name": "baseline-code15-only",
       "status": "planned",
       "args": [
         "--lr",
         "1e-3"
       ],
-      "note": "First run on the fixed pipeline: decisions 0001, 0002, 0004, 0005, 0006, 0007."
+      "note": "Source-shortcut check: same as baseline-all-sources without SaMi-Trop and PTB-XL."
     }
   ],
   "failure_policy": {
